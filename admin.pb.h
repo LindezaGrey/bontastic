@@ -4,12 +4,12 @@
 #ifndef PB_MESHTASTIC_MESHTASTIC_ADMIN_PB_H_INCLUDED
 #define PB_MESHTASTIC_MESHTASTIC_ADMIN_PB_H_INCLUDED
 #include <pb.h>
-#include "meshtastic/channel.pb.h"
-#include "meshtastic/config.pb.h"
-#include "meshtastic/connection_status.pb.h"
-#include "meshtastic/device_ui.pb.h"
-#include "meshtastic/mesh.pb.h"
-#include "meshtastic/module_config.pb.h"
+#include "channel.pb.h"
+#include "config.pb.h"
+#include "connection_status.pb.h"
+#include "device_ui.pb.h"
+#include "mesh.pb.h"
+#include "module_config.pb.h"
 
 #if PB_PROTO_HEADER_VERSION != 40
 #error Regenerate this file with the current version of nanopb generator.

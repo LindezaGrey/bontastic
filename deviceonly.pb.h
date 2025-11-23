@@ -5,11 +5,11 @@
 #define PB_MESHTASTIC_MESHTASTIC_DEVICEONLY_PB_H_INCLUDED
 #include <pb.h>
 #include <vector>
-#include "meshtastic/channel.pb.h"
-#include "meshtastic/config.pb.h"
-#include "meshtastic/localonly.pb.h"
-#include "meshtastic/mesh.pb.h"
-#include "meshtastic/telemetry.pb.h"
+#include "channel.pb.h"
+#include "config.pb.h"
+#include "localonly.pb.h"
+#include "mesh.pb.h"
+#include "telemetry.pb.h"
 
 #if PB_PROTO_HEADER_VERSION != 40
 #error Regenerate this file with the current version of nanopb generator.
