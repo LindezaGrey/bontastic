@@ -1,5 +1,8 @@
 #include "NimBLEDevice.h"
 #include "Arduino.h"
+#include "src/protobufs/mesh.pb.h"
+#include "src/nanopb/pb.h"
+#include "src/nanopb/pb_encode.h"
 
 const char *targetName = "🚐_cdb5";
 const uint32_t targetPasskey = 123456;
@@ -15,6 +18,8 @@ const char *serialNumberUuid = "2a25";
 const char *hardwareRevUuid = "2a27";
 const char *firmwareRevUuid = "2a26";
 const char *softwareRevUuid = "2a28";
+
+static uint32_t wantConfigId;
 
 void drainFromRadio(NimBLERemoteCharacteristic *characteristic)
 {
@@ -67,6 +72,8 @@ void setup()
   {
   }
   Serial.println("Lets Go");
+
+  wantConfigId = millis() & 0xFFFF;
 
   NimBLEDevice::init("");
   NimBLEDevice::deleteAllBonds();
@@ -170,9 +177,20 @@ void setup()
     return;
   }
 
-  const uint8_t startConfig[] = {0x18, 0x01};
+  meshtastic_ToRadio req = meshtastic_ToRadio_init_zero;
+  req.which_payload_variant = meshtastic_ToRadio_want_config_id_tag;
+  req.want_config_id = wantConfigId++;
+
+  uint8_t buffer[16];
+  pb_ostream_t ostream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+  if (!pb_encode(&ostream, meshtastic_ToRadio_fields, &req))
+  {
+    Serial.println("Start config encode failed");
+    return;
+  }
+
   Serial.println("Request config");
-  if (!toRadio->writeValue(startConfig, sizeof(startConfig), true))
+  if (!toRadio->writeValue(buffer, ostream.bytes_written, true))
   {
     Serial.println("Start config failed");
     return;
