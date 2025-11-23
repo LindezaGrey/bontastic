@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include "src/protobufs/mesh.pb.h"
 #include "src/nanopb/pb.h"
+#include "src/nanopb/pb_decode.h"
 #include "src/nanopb/pb_encode.h"
 
 const char *targetName = "🚐_cdb5";
@@ -38,6 +39,27 @@ void drainFromRadio(NimBLERemoteCharacteristic *characteristic)
     }
     Serial.print("FromRadio bytes ");
     Serial.println(packet.size());
+
+    meshtastic_FromRadio msg = meshtastic_FromRadio_init_zero;
+    pb_istream_t stream = pb_istream_from_buffer(reinterpret_cast<const uint8_t *>(packet.data()), packet.size());
+    if (!pb_decode(&stream, meshtastic_FromRadio_fields, &msg))
+    {
+      Serial.println("FromRadio decode failed");
+      continue;
+    }
+
+    if (msg.which_payload_variant == meshtastic_FromRadio_packet_tag)
+    {
+      const meshtastic_Data &d = msg.packet.decoded;
+      if (d.payload.size > 0)
+      {
+        Serial.print("Port ");
+        Serial.print(d.portnum);
+        Serial.print(" Text ");
+        Serial.write(d.payload.bytes, d.payload.size);
+        Serial.println();
+      }
+    }
   }
 }
 
