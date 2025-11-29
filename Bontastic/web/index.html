@@ -389,6 +389,43 @@
                 <article
                     class="ghost-grid border border-green-500/20 rounded-xl p-5 bg-black/40 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
                     <header class="flex justify-between items-center text-green-300">
+                        <h2 class="text-lg font-mono tracking-wide">CHARSET</h2>
+                        <span class="text-s">{{ charsetLabel }}</span>
+                    </header>
+                    <div class="mt-6 space-y-4">
+                        <select v-model.number="settings.charset" @change="updateSetting('charset')"
+                            :disabled="!connected"
+                            class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100">
+                            <option v-for="opt in charsetOptions" :key="opt.value" :value="opt.value">
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                        <p class="text-s text-green-200/70">international character set</p>
+                    </div>
+                </article>
+                <article
+                    class="ghost-grid border border-green-500/20 rounded-xl p-5 bg-black/40 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
+                    <header class="flex justify-between items-center text-green-300">
+                        <h2 class="text-lg font-mono tracking-wide">CODE PAGE</h2>
+                        <span class="text-s">{{ codePageLabel }}</span>
+                    </header>
+                    <div class="mt-6 space-y-4">
+                        <select v-model.number="settings.codePage" @change="updateSetting('codePage')"
+                            :disabled="!connected"
+                            class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100">
+                            <option v-for="opt in codePageOptions" :key="opt.value" :value="opt.value">
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                        <p class="text-s text-green-200/70">extended character table</p>
+                    </div>
+                </article>
+            </section>
+
+            <section class="grid gap-6 md:grid-cols-2">
+                <article
+                    class="ghost-grid border border-green-500/20 rounded-xl p-5 bg-black/40 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
+                    <header class="flex justify-between items-center text-green-300">
                         <h2 class="text-lg font-mono tracking-wide">TEXT DECORATION</h2>
                         <span class="text-s">{{ decorationLabel }}</span>
                     </header>
@@ -456,9 +493,11 @@
             justify: '5a1a000a-8f19-4a86-9a9e-7b4f7f9b0002',
             decorations: '5a1a000b-8f19-4a86-9a9e-7b4f7f9b0002',
             feed: '5a1a000c-8f19-4a86-9a9e-7b4f7f9b0002',
-            printText: '5a1a000d-8f19-4a86-9a9e-7b4f7f9b0002',
-            meshName: '5a1a000e-8f19-4a86-9a9e-7b4f7f9b0002',
-            meshPin: '5a1a000f-8f19-4a86-9a9e-7b4f7f9b0002'
+            charset: '5a1a000d-8f19-4a86-9a9e-7b4f7f9b0002',
+            codePage: '5a1a000e-8f19-4a86-9a9e-7b4f7f9b0002',
+            printText: '5a1a000f-8f19-4a86-9a9e-7b4f7f9b0002',
+            meshName: '5a1a0010-8f19-4a86-9a9e-7b4f7f9b0002',
+            meshPin: '5a1a0011-8f19-4a86-9a9e-7b4f7f9b0002'
         };
 
         const encoder = new TextEncoder();
@@ -489,6 +528,8 @@
                         justify: 0,
                         decorations: 0,
                         feed: 0,
+                        charset: 0,
+                        codePage: 0,
                         meshName: '',
                         meshPin: ''
                     },
@@ -500,6 +541,70 @@
                         { value: 4, label: 'strike' },
                         { value: 8, label: 'double width' },
                         { value: 9, label: 'bold + double' }
+                    ],
+                    charsetOptions: [
+                        { value: 0, label: 'USA' },
+                        { value: 1, label: 'France' },
+                        { value: 2, label: 'Germany' },
+                        { value: 3, label: 'UK' },
+                        { value: 4, label: 'Denmark 1' },
+                        { value: 5, label: 'Sweden' },
+                        { value: 6, label: 'Italy' },
+                        { value: 7, label: 'Spain 1' },
+                        { value: 8, label: 'Japan' },
+                        { value: 9, label: 'Norway' },
+                        { value: 10, label: 'Denmark 2' },
+                        { value: 11, label: 'Spain 2' },
+                        { value: 12, label: 'Latin America' },
+                        { value: 13, label: 'Korea' },
+                        { value: 14, label: 'Slovenia/Croatia' },
+                        { value: 15, label: 'China' }
+                    ],
+                    codePageOptions: [
+                        { value: 0, label: 'CP437 (USA, Std Europe)' },
+                        { value: 1, label: 'Katakana' },
+                        { value: 2, label: 'CP850 (Multilingual)' },
+                        { value: 3, label: 'CP860 (Portuguese)' },
+                        { value: 4, label: 'CP863 (Canadian-French)' },
+                        { value: 5, label: 'CP865 (Nordic)' },
+                        { value: 6, label: 'WCP1251 (Cyrillic)' },
+                        { value: 7, label: 'CP866 (Cyrillic #2)' },
+                        { value: 8, label: 'MIK (Cyrillic/Bulgarian)' },
+                        { value: 9, label: 'CP755 (East Europe, Latvian 2)' },
+                        { value: 10, label: 'Iran 1' },
+                        { value: 15, label: 'CP862 (Hebrew)' },
+                        { value: 16, label: 'WCP1252 (Latin 1)' },
+                        { value: 17, label: 'WCP1253 (Greek)' },
+                        { value: 18, label: 'CP852 (Latin 2)' },
+                        { value: 19, label: 'CP858 (Multilingual Latin 1 + Euro)' },
+                        { value: 20, label: 'Iran 2' },
+                        { value: 21, label: 'Latvian' },
+                        { value: 22, label: 'CP864 (Arabic)' },
+                        { value: 23, label: 'ISO-8859-1 (West Europe)' },
+                        { value: 24, label: 'CP737 (Greek)' },
+                        { value: 25, label: 'WCP1257 (Baltic)' },
+                        { value: 26, label: 'Thai' },
+                        { value: 27, label: 'CP720 (Arabic)' },
+                        { value: 28, label: 'CP855 (Cyrillic)' },
+                        { value: 29, label: 'CP857 (Turkish)' },
+                        { value: 30, label: 'WCP1250 (Central Europe)' },
+                        { value: 31, label: 'CP775 (Baltic)' },
+                        { value: 32, label: 'WCP1254 (Turkish)' },
+                        { value: 33, label: 'WCP1255 (Hebrew)' },
+                        { value: 34, label: 'WCP1256 (Arabic)' },
+                        { value: 35, label: 'WCP1258 (Vietnam)' },
+                        { value: 36, label: 'ISO-8859-2 (Latin 2)' },
+                        { value: 37, label: 'ISO-8859-3 (Latin 3)' },
+                        { value: 38, label: 'ISO-8859-4 (Baltic)' },
+                        { value: 39, label: 'ISO-8859-5 (Cyrillic)' },
+                        { value: 40, label: 'ISO-8859-6 (Arabic)' },
+                        { value: 41, label: 'ISO-8859-7 (Greek)' },
+                        { value: 42, label: 'ISO-8859-8 (Hebrew)' },
+                        { value: 43, label: 'ISO-8859-9 (Turkish)' },
+                        { value: 44, label: 'ISO-8859-15 (Latin 3)' },
+                        { value: 45, label: 'Thai 2' },
+                        { value: 46, label: 'CP856 (Hebrew)' },
+                        { value: 47, label: 'CP874 (Thai)' }
                     ],
                     log: [],
                     nextLogId: 0
@@ -515,6 +620,14 @@
                 decorationLabel() {
                     const match = this.decorationOptions.find(opt => opt.value === this.settings.decorations);
                     return match ? match.label : this.settings.decorations;
+                },
+                charsetLabel() {
+                    const match = this.charsetOptions.find(opt => opt.value === this.settings.charset);
+                    return match ? match.label : this.settings.charset;
+                },
+                codePageLabel() {
+                    const match = this.codePageOptions.find(opt => opt.value === this.settings.codePage);
+                    return match ? match.label : this.settings.codePage;
                 }
             },
             methods: {

@@ -15,6 +15,8 @@ struct PrinterSettings
     uint8_t justify;
     uint8_t decorations;
     uint8_t feedRows;
+    uint8_t charset;
+    uint8_t codePage;
     char meshName[32];
     char meshPin[16];
 };

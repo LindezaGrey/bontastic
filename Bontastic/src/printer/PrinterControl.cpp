@@ -25,7 +25,9 @@ static const char *fieldUuids[] = {
     "5a1a000c-8f19-4a86-9a9e-7b4f7f9b0002",
     "5a1a000d-8f19-4a86-9a9e-7b4f7f9b0002",
     "5a1a000e-8f19-4a86-9a9e-7b4f7f9b0002",
-    "5a1a000f-8f19-4a86-9a9e-7b4f7f9b0002"};
+    "5a1a000f-8f19-4a86-9a9e-7b4f7f9b0002",
+    "5a1a0010-8f19-4a86-9a9e-7b4f7f9b0002",
+    "5a1a0011-8f19-4a86-9a9e-7b4f7f9b0002"};
 
 enum SettingField : uint8_t
 {
@@ -40,6 +42,8 @@ enum SettingField : uint8_t
     JustifySelect,
     Decorations,
     Feed,
+    Charset,
+    CodePage,
     PrintText,
     MeshName,
     MeshPin,
@@ -50,7 +54,7 @@ static const uint16_t printerAppearance = 0x03C0;
 
 static NimBLEServer *printerServer;
 static NimBLECharacteristic *characteristics[FieldCount];
-static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, "MO1_1dfd", "123456"};
+static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, 0, 0, "MO1_1dfd", "123456"};
 static PrinterSettings printerSettings = defaultSettings;
 static Preferences printerPrefs;
 static bool prefsReady;
@@ -81,6 +85,10 @@ static const char *fieldLabel(uint8_t field)
         return "DECOR";
     case Feed:
         return "FEED";
+    case Charset:
+        return "CHARSET";
+    case CodePage:
+        return "CODEPAGE";
     case PrintText:
         return "PRINT";
     case MeshName:
@@ -104,6 +112,8 @@ static const char *fieldKeys[] = {
     "justify",
     "decorations",
     nullptr,
+    "charset",
+    "codePage",
     nullptr,
     "meshName",
     "meshPin"};
@@ -203,6 +213,10 @@ static void *fieldSlot(uint8_t field)
         return &printerSettings.decorations;
     case Feed:
         return &printerSettings.feedRows;
+    case Charset:
+        return &printerSettings.charset;
+    case CodePage:
+        return &printerSettings.codePage;
     case MeshName:
         return printerSettings.meshName;
     case MeshPin:
@@ -240,6 +254,10 @@ static uint16_t clampField(uint8_t field, int value)
         return constrain(value, 0, 15);
     case Feed:
         return constrain(value, 0, 50);
+    case Charset:
+        return constrain(value, 0, 15);
+    case CodePage:
+        return constrain(value, 0, 47);
     case PrintText:
         return 0;
     default:
@@ -306,6 +324,8 @@ static void applyPrinterConfig()
     printer.setHeatConfig(printerSettings.heatDots, printerSettings.heatTime, printerSettings.heatInterval);
     printer.setPrintDensity(printerSettings.density, printerSettings.breakTime);
     printer.setLineHeight(printerSettings.lineHeight);
+    printer.setCharset(printerSettings.charset);
+    printer.setCodePage(printerSettings.codePage);
     printer.setFont(printerSettings.font ? 'B' : 'A');
     printer.setSize(printerSettings.size == 0 ? 'S' : (printerSettings.size == 1 ? 'M' : 'L'));
     printer.justify(printerSettings.justify == 0 ? 'L' : (printerSettings.justify == 1 ? 'C' : 'R'));
