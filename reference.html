@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Remote HID for AtomS3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#00ff88',
+                            50: '#eafff5',
+                            100: '#caffea',
+                            200: '#8effd4',
+                            300: '#5affbf',
+                            400: '#26ffa9',
+                            500: '#00ff88',
+                            600: '#00d46f',
+                            700: '#00aa59',
+                            800: '#007f42',
+                            900: '#00552c',
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        #mousepad {
+            touch-action: none;
+        }
+
+        input[type="checkbox"] {
+            accent-color: #00ff88;
+        }
+    </style>
+    <meta name="color-scheme" content="dark light">
+</head>
+
+<body class="min-h-screen bg-gray-950 text-green-100 font-mono selection:bg-primary/30 selection:text-green-100">
+    <div id="app">
+        <!-- Main app content (always visible; controls disable when disconnected) -->
+        <main class="max-w-3xl mx-auto p-6 md:p-8 space-y-8">
+            <header class="flex items-start md:items-center justify-between gap-3">
+                <h1 class="text-2xl md:text-3xl font-semibold tracking-tight text-primary">Remote Atom</h1>
+                <div class="flex flex-col items-end gap-1 md:flex-row md:items-center md:gap-3">
+                    <!-- Connect button shown when disconnected -->
+                    <button v-if="!connected" @click="openConnect" title="Connect" style="height: 38px;"
+                        class="order-1 md:order-4 px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition">
+                        Connect
+                    </button>
+                    <span
+                        class="order-2 md:order-1 text-[10px] md:text-xs px-2 py-1 rounded border border-green-700/40 bg-black/30 text-green-300/70">wiggler:
+                        {{ wiggleActive ? 'on' : 'off' }}</span>
+                    <span
+                        class="order-3 md:order-2 text-[10px] md:text-xs px-2 py-1 rounded border border-green-700/40 bg-black/30 text-green-300/70">status:
+                        {{ statusMsg }}</span>
+                    <button @click="openSettings" title="Settings" style="width: 38px; height: 38px;"
+                        class="order-1 md:order-3 flex justify-center items-center rounded border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary transition">
+                        <iconify-icon icon="heroicons-outline:cog-6-tooth" width="20" height="20"
+                            aria-hidden="true"></iconify-icon>
+                    </button>
+                </div>
+            </header>
+
+            <section class="space-y-4">
+                <h2 class="text-lg font-semibold text-green-200/90">Keyboard</h2>
+                <!-- Tabs -->
+                <div class="flex items-center gap-2 border-b border-green-700/40 pb-2">
+                    <button @click="activateTab('direct')"
+                        :class="['px-3 py-1 rounded-t border border-transparent', tab==='direct' ? 'text-primary bg-primary/10' : 'text-green-300/80 hover:text-primary/90']">Direct</button>
+                    <button @click="activateTab('paste')"
+                        :class="['px-3 py-1 rounded-t border border-transparent', tab==='paste' ? 'text-primary bg-primary/10' : 'text-green-300/80 hover:text-primary/90']">Paste</button>
+                    <button @click="activateTab('media')"
+                        :class="['px-3 py-1 rounded-t border border-transparent', tab==='media' ? 'text-primary bg-primary/10' : 'text-green-300/80 hover:text-primary/90']">Media</button>
+                </div>
+                <!-- Tab panels -->
+                <div v-show="tab==='direct'" class="space-y-2">
+                    <label for="direct" class="block text-green-200/80">Direct input (sends immediately)</label>
+                    <input id="direct" ref="directInputRef" :disabled="!connected" type="text" inputmode="text"
+                        enterkeyhint="send" autocomplete="off" autocapitalize="sentences" v-model="directInput"
+                        @compositionstart="composing=true" @compositionend="onCompositionEnd" @input="onDirectInput"
+                        @keydown.enter.prevent="sendEnter" @keydown="onDirectKeydown"
+                        class="w-full bg-black/40 text-green-100 placeholder-green-400/40 border border-green-700/30 rounded p-3 focus:outline-none focus:ring-2 focus:ring-primary/60"
+                        placeholder="Tap and type…" />
+                    <p class="text-xs text-green-300/60">Tip: Backspace and Enter are supported. Text is sent as you
+                        type
+                        and the field clears to keep the keyboard open.</p>
+                </div>
+                <div v-show="tab==='paste'" class="space-y-3">
+                    <textarea id="kb" :disabled="!connected" v-model="kbText"
+                        placeholder="Type here to send keystrokes..."
+                        class="w-full h-32 md:h-36 resize-y bg-black/40 text-green-100 placeholder-green-400/40 border border-green-700/30 rounded p-3 focus:outline-none focus:ring-2 focus:ring-primary/60"></textarea>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button @click="sendPaste" :disabled="!connected"
+                            class="px-4 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed">
+                            Send Text
+                        </button>
+                        <label class="inline-flex items-center gap-2 text-green-200/80">
+                            <input type="checkbox" id="nl" v-model="appendNewline" :disabled="!connected">
+                            <span>append Enter</span>
+                        </label>
+                    </div>
+                </div>
+                <div v-show="tab==='media'" class="space-y-3">
+                    <div class="grid grid-cols-3 gap-3">
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x01)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Play/Pause">▶︎/⏸</button>
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x02)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Next Track">⏭</button>
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x03)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Previous Track">⏮</button>
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x04)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Stop">⏹</button>
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x05)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Mute">🔇</button>
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x06)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Volume Up">🔊＋</button>
+                        <button :disabled="!connected || !mediaChar" @click="sendMedia(0x07)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Volume Down">🔉−</button>
+                    </div>
+                    <p v-if="connected && !mediaChar" class="text-xs text-yellow-300/80">
+                        Media controls require updated firmware. Please flash the latest sketch.
+                    </p>
+                </div>
+            </section>
+
+            <section class="space-y-3">
+                <h2 class="text-lg font-semibold text-green-200/90">Mouse</h2>
+                <canvas id="mousepad" ref="padRef" @mousedown="onMouseDown" @mousemove="onMouseMove"
+                    @touchstart.prevent="onTouchStart" @touchmove.prevent="onTouchMove" @touchend.prevent="onTouchEnd"
+                    class="w-full h-72 rounded border border-green-700/40 bg-black/40"></canvas>
+                <div class="space-y-3">
+                    <div class="grid gap-3" style="grid-template-columns: 2fr 1fr 2fr;">
+                        <button id="btnLeft" :disabled="!connected" @pointerdown.prevent="onBtnPointerDown('L', $event)"
+                            @pointerup.prevent="onBtnPointerUp('L', $event)"
+                            @pointercancel.prevent="onBtnPointerUp('L', $event)" @contextmenu.prevent
+                            :class="['px-4 py-3 rounded border border-primary/40 transition', (currentButtons & BTN.L) ? 'bg-primary/20 text-primary' : 'bg-primary/10 hover:bg-primary/20 text-primary']">
+                            Left
+                        </button>
+                        <button id="btnMiddle" :disabled="!connected"
+                            @pointerdown.prevent="onBtnPointerDown('M', $event)"
+                            @pointerup.prevent="onBtnPointerUp('M', $event)"
+                            @pointercancel.prevent="onBtnPointerUp('M', $event)" @contextmenu.prevent
+                            :class="['px-4 py-3 rounded border border-primary/40 transition', (currentButtons & BTN.M) ? 'bg-primary/20 text-primary' : 'bg-primary/10 hover:bg-primary/20 text-primary']">
+                            Middle
+                        </button>
+                        <button id="btnRight" :disabled="!connected"
+                            @pointerdown.prevent="onBtnPointerDown('R', $event)"
+                            @pointerup.prevent="onBtnPointerUp('R', $event)"
+                            @pointercancel.prevent="onBtnPointerUp('R', $event)" @contextmenu.prevent
+                            :class="['px-4 py-3 rounded border border-primary/40 transition', (currentButtons & BTN.R) ? 'bg-primary/20 text-primary' : 'bg-primary/10 hover:bg-primary/20 text-primary']">
+                            Right
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 justify-end">
+                        <button id="wheelUp" :disabled="!connected" @click="wheel(+scrollFactor)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed">Wheel
+                            ↑</button>
+                        <button id="wheelDown" :disabled="!connected" @click="wheel(-scrollFactor)"
+                            class="px-3 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed">Wheel
+                            ↓</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Connect Modal -->
+        <div v-if="showConnect" class="fixed inset-0 z-50">
+            <div class="absolute inset-0 bg-black/60" @click="closeConnect"></div>
+            <div
+                class="relative max-w-md mx-auto mt-24 bg-gray-900 border border-green-700/40 rounded shadow-xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-green-200">Connect</h3>
+                    <button @click="closeConnect" class="p-1 text-green-300/80 hover:text-primary">✕</button>
+                </div>
+                <div class="space-y-4 text-center">
+                    <p class="text-green-300/80">{{ statusMsg }}</p>
+                    <button @click="connect" :disabled="connecting"
+                        class="px-6 py-3 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        {{ connecting ? 'Connecting…' : 'Connect' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div v-if="showSettings" class="fixed inset-0 z-50">
+            <div class="absolute inset-0 bg-black/60" @click="closeSettings"></div>
+            <div
+                class="relative max-w-md mx-auto mt-24 bg-gray-900 border border-green-700/40 rounded shadow-xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-green-200">Settings</h3>
+                    <button @click="doneSettings" class="p-1 text-green-300/80 hover:text-primary">✕</button>
+                </div>
+                <div class="space-y-4">
+                    <label class="block">
+                        <span class="text-sm text-green-200/80">Mouse speed</span>
+                        <input type="range" min="0.1" max="3" step="0.1" class="w-full"
+                            v-model.number="settings.mouseSpeed" />
+                        <div class="text-xs text-green-300/70">Factor: <span>{{ settings.mouseSpeed.toFixed(1) }}</span>
+                        </div>
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-green-200/80">Scroll step</span>
+                        <input type="range" min="1" max="10" step="1" class="w-full"
+                            v-model.number="settings.scrollFactor" />
+                        <div class="text-xs text-green-300/70">Lines per tick: <span>{{ settings.scrollFactor }}</span>
+                        </div>
+                    </label>
+                    <label class="block">
+                        <input type="checkbox" :checked="wiggleActive" :disabled="!wiggleChar" @change="toggleWiggler">
+                        <span class="ml-2 text-sm text-green-200/80">Enable mouse wiggler</span>
+                    </label>
+                    <label class="block">
+                        <input type="checkbox" :checked="fullscreen" @change="toggleFullscreen">
+                        <span class="ml-2 text-sm text-green-200/80">Fullscreen</span>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <button @click="disconnect"
+                        class="px-4 py-2 rounded border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition">Disconnect</button>
+                    <button @click="doneSettings"
+                        class="px-4 py-2 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        // Helpers available to data() before Vue instance exists
+        function safeNumber(v, def, min, max) {
+            const n = parseFloat(v);
+            if (!isFinite(n)) return def;
+            return Math.min(max, Math.max(min, n));
+        }
+        function safeInt(v, def, min, max) {
+            const n = parseInt(v, 10);
+            if (!Number.isInteger(n)) return def;
+            return Math.min(max, Math.max(min, n));
+        }
+
+        createApp({
+            data() {
+                return {
+                    // BLE constants
+                    SERVICE_UUID: "5a1a0001-8f19-4a86-9a9e-7b4f7f9b0001",
+                    KBD_CHAR_UUID: "5a1a0002-8f19-4a86-9a9e-7b4f7f9b0001",
+                    MOUSE_CHAR_UUID: "5a1a0003-8f19-4a86-9a9e-7b4f7f9b0001",
+                    WIGGLE_CHAR_UUID: "5a1a0004-8f19-4a86-9a9e-7b4f7f9b0001",
+                    MEDIA_CHAR_UUID: "5a1a0005-8f19-4a86-9a9e-7b4f7f9b0001",
+
+                    // BLE handles
+                    device: null,
+                    server: null,
+                    kbdChar: null,
+                    mouseChar: null,
+                    wiggleChar: null,
+                    mediaChar: null,
+
+                    // UI state
+                    connected: false,
+                    connecting: false,
+                    statusMsg: 'disconnected',
+                    tab: 'direct',
+                    showSettings: false,
+                    fullscreen: false,
+                    // Connect modal state
+                    showConnect: false,
+
+                    // Keyboard
+                    directInput: '',
+                    composing: false,
+                    kbText: '',
+                    appendNewline: true,
+
+                    // Mouse
+                    lastX: 0,
+                    lastY: 0,
+                    isDown: false,
+                    currentButtons: 0,
+                    BTN: { L: 1, R: 2, M: 4 },
+
+                    // Settings values
+                    mouseSpeed: safeNumber(localStorage.getItem('mouseSpeed'), 0.5, 0.1, 3.0),
+                    scrollFactor: safeInt(localStorage.getItem('scrollFactor'), 1, 1, 10),
+                    settings: { mouseSpeed: 0.5, scrollFactor: 1 },
+
+                    // Wiggle
+                    wiggleActive: false,
+
+                    // send chain
+                    sendChain: Promise.resolve(),
+                };
+            },
+            mounted() {
+                // Reflect initial fullscreen state
+                this.reflectFullscreen();
+                document.addEventListener('fullscreenchange', this.reflectFullscreen);
+                document.addEventListener('webkitfullscreenchange', this.reflectFullscreen);
+                document.addEventListener('msfullscreenchange', this.reflectFullscreen);
+                document.addEventListener('mouseup', this.onMouseUpDoc);
+                // Show connect modal initially when not connected
+                if (!this.connected) this.showConnect = true;
+            },
+            beforeUnmount() {
+                document.removeEventListener('fullscreenchange', this.reflectFullscreen);
+                document.removeEventListener('webkitfullscreenchange', this.reflectFullscreen);
+                document.removeEventListener('msfullscreenchange', this.reflectFullscreen);
+                document.removeEventListener('mouseup', this.onMouseUpDoc);
+            },
+            methods: {
+                // Utils
+                safeNumber(v, def, min, max) {
+                    const n = parseFloat(v);
+                    if (!isFinite(n)) return def;
+                    return Math.min(max, Math.max(min, n));
+                },
+                safeInt(v, def, min, max) {
+                    const n = parseInt(v, 10);
+                    if (!Number.isInteger(n)) return def;
+                    return Math.min(max, Math.max(min, n));
+                },
+                setStatus(msg) { this.statusMsg = msg; },
+                activateTab(name) { this.tab = name; this.$nextTick(() => { if (name === 'direct') this.focusDirect(); }); },
+                focusDirect() {
+                    const el = this.$refs.directInputRef;
+                    if (!el) return;
+                    // next tick to ensure DOM ready
+                    setTimeout(() => { try { el.focus({ preventScroll: true }); } catch { } }, 0);
+                },
+
+                // Fullscreen helpers
+                isFullscreen() {
+                    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+                },
+                requestFullscreen(el) {
+                    if (el.requestFullscreen) return el.requestFullscreen();
+                    if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+                    if (el.msRequestFullscreen) return el.msRequestFullscreen();
+                    return Promise.reject(new Error('Fullscreen API not supported'));
+                },
+                exitFullscreen() {
+                    if (document.exitFullscreen) return document.exitFullscreen();
+                    if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+                    if (document.msExitFullscreen) return document.msExitFullscreen();
+                    return Promise.resolve();
+                },
+                reflectFullscreen() { this.fullscreen = this.isFullscreen(); },
+                toggleFullscreen() {
+                    try {
+                        if (!this.isFullscreen()) {
+                            this.requestFullscreen(document.documentElement).catch(() => { });
+                        } else {
+                            this.exitFullscreen().catch(() => { });
+                        }
+                    } catch { }
+                },
+
+                // BLE
+                async connect() {
+                    try {
+                        this.connecting = true;
+                        const device = await navigator.bluetooth.requestDevice({
+                            filters: [{ services: [this.SERVICE_UUID] }],
+                            optionalServices: [this.SERVICE_UUID]
+                        });
+                        this.device = device;
+                        device.addEventListener('gattserverdisconnected', this.onDisconnected);
+                        this.server = await device.gatt.connect();
+                        const svc = await this.server.getPrimaryService(this.SERVICE_UUID);
+                        this.kbdChar = await svc.getCharacteristic(this.KBD_CHAR_UUID);
+                        this.mouseChar = await svc.getCharacteristic(this.MOUSE_CHAR_UUID);
+                        // Optional media keys characteristic
+                        try { this.mediaChar = await svc.getCharacteristic(this.MEDIA_CHAR_UUID); } catch { this.mediaChar = null; }
+                        // Optional wiggler
+                        try {
+                            this.wiggleChar = await svc.getCharacteristic(this.WIGGLE_CHAR_UUID);
+                            if (this.wiggleChar) {
+                                try {
+                                    const dv = await this.wiggleChar.readValue();
+                                    this.wiggleActive = !!dv.getUint8(0);
+                                } catch { }
+                                try {
+                                    await this.wiggleChar.startNotifications();
+                                    this.wiggleChar.addEventListener('characteristicvaluechanged', (e) => {
+                                        try {
+                                            const dv = e.target.value;
+                                            this.wiggleActive = !!dv.getUint8(0);
+                                        } catch { }
+                                    });
+                                } catch { }
+                            }
+                        } catch { this.wiggleChar = null; }
+                        this.connected = true;
+                        this.setStatus('connected');
+                        // Switch to direct tab (no longer auto-fullscreen by default)
+                        this.activateTab('direct');
+                        // Close connect modal if open
+                        this.showConnect = false;
+                    } catch (e) {
+                        console.error(e);
+                        this.setStatus('error');
+                    } finally {
+                        this.connecting = false;
+                    }
+                },
+                onDisconnected() {
+                    this.connected = false;
+                    this.setStatus('disconnected');
+                    this.kbdChar = this.mouseChar = this.wiggleChar = this.server = null;
+                    this.wiggleActive = false;
+                    // Re-open connect modal when we drop connection
+                    this.showConnect = true;
+                },
+                async disconnect() {
+                    try { this.device && this.device.gatt && this.device.gatt.disconnect(); } catch { }
+                    this.onDisconnected();
+                    this.closeSettings();
+                },
+
+                // Keyboard send
+                async sendText(text) {
+                    if (!this.kbdChar || !text) return;
+                    const enc = new TextEncoder();
+                    const MAX = 160;
+                    const bytes = enc.encode(text);
+                    this.sendChain = this.sendChain.then(async () => {
+                        for (let i = 0; i < bytes.length; i += MAX) {
+                            const slice = bytes.slice(i, i + MAX);
+                            try { await this.kbdChar.writeValueWithoutResponse(slice); } catch (e) { console.warn('write failed', e); }
+                        }
+                    }).catch(() => { });
+                    return this.sendChain;
+                },
+                async sendPaste() {
+                    if (!this.connected) return;
+                    let txt = this.kbText || '';
+                    if (this.appendNewline) txt += '\n';
+                    await this.sendText(txt);
+                },
+                onCompositionEnd() {
+                    this.composing = false;
+                    const v = this.directInput;
+                    if (v) { this.sendText(v); this.directInput = ''; this.focusDirect(); }
+                },
+                onDirectInput() {
+                    if (this.composing) return;
+                    const v = this.directInput;
+                    if (!v) return;
+                    this.sendText(v);
+                    this.directInput = '';
+                    this.focusDirect();
+                },
+                onDirectKeydown(e) {
+                    if (e.key === 'Backspace') { e.preventDefault(); this.sendBackspace(); }
+                },
+                sendEnter() { this.sendText('\n'); this.directInput = ''; this.focusDirect(); },
+                sendBackspace() { this.sendText('\b'); this.focusDirect(); },
+
+                // Mouse
+                async sendMouse(dx, dy, wheel = 0) {
+                    if (!this.mouseChar) return;
+                    const buf = new Uint8Array(4);
+                    buf[0] = this.currentButtons & 0xff;
+                    buf[1] = (dx << 24) >> 24;
+                    buf[2] = (dy << 24) >> 24;
+                    buf[3] = (wheel << 24) >> 24;
+                    try { await this.mouseChar.writeValueWithoutResponse(buf); } catch { }
+                },
+                onMouseDown(e) {
+                    this.isDown = true; this.lastX = e.clientX; this.lastY = e.clientY;
+                },
+                onMouseMove(e) {
+                    if (!this.isDown) return;
+                    const dx = Math.round((e.clientX - this.lastX) * this.mouseSpeed);
+                    const dy = Math.round((e.clientY - this.lastY) * this.mouseSpeed);
+                    this.lastX = e.clientX; this.lastY = e.clientY;
+                    if (dx || dy) this.sendMouse(dx, dy, 0);
+                },
+                onMouseUpDoc() { this.isDown = false; },
+                onTouchStart(e) {
+                    const t = e.changedTouches[0];
+                    this.isDown = true; this.lastX = t.clientX; this.lastY = t.clientY;
+                },
+                onTouchMove(e) {
+                    const t = e.changedTouches[0];
+                    if (!this.isDown) return;
+                    const dx = Math.round((t.clientX - this.lastX) * this.mouseSpeed);
+                    const dy = Math.round((t.clientY - this.lastY) * this.mouseSpeed);
+                    this.lastX = t.clientX; this.lastY = t.clientY;
+                    if (dx || dy) this.sendMouse(dx, dy, 0);
+                },
+                onTouchEnd() { this.isDown = false; },
+                bitFor(name) { return name === 'L' ? this.BTN.L : name === 'R' ? this.BTN.R : this.BTN.M; },
+                onBtnPointerDown(name, e) {
+                    try { e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); } catch { }
+                    const bit = this.bitFor(name);
+                    const before = this.currentButtons;
+                    this.currentButtons |= bit;
+                    if (this.currentButtons !== before) this.sendMouse(0, 0, 0);
+                },
+                onBtnPointerUp(name) {
+                    const bit = this.bitFor(name);
+                    const before = this.currentButtons;
+                    this.currentButtons &= ~bit;
+                    if (this.currentButtons !== before) this.sendMouse(0, 0, 0);
+                },
+                wheel(amount) { this.sendMouse(0, 0, amount); },
+
+                // Media keys
+                async sendMedia(code) {
+                    if (!this.mediaChar) return;
+                    try {
+                        const data = new Uint8Array([code & 0xff]);
+                        if (this.mediaChar.writeValueWithoutResponse) await this.mediaChar.writeValueWithoutResponse(data);
+                        else await this.mediaChar.writeValue(data);
+                    } catch (e) {
+                        console.warn('media write failed', e);
+                    }
+                },
+
+                // Settings modal
+                openSettings() {
+                    this.settings.mouseSpeed = this.mouseSpeed;
+                    this.settings.scrollFactor = this.scrollFactor;
+                    this.showSettings = true;
+                },
+                closeSettings() { this.showSettings = false; },
+                // Connect modal controls
+                openConnect() { this.showConnect = true; },
+                closeConnect() { this.showConnect = false; },
+                doneSettings() {
+                    // apply & persist
+                    let ms = this.safeNumber(this.settings.mouseSpeed, 0.5, 0.1, 3.0);
+                    let sf = this.safeInt(this.settings.scrollFactor, 1, 1, 10);
+                    this.mouseSpeed = ms; this.scrollFactor = sf;
+                    localStorage.setItem('mouseSpeed', String(ms));
+                    localStorage.setItem('scrollFactor', String(sf));
+                    this.closeSettings();
+                },
+
+                // Wiggler
+                async toggleWiggler(e) {
+                    const desired = !!e.target.checked;
+                    if (!this.wiggleChar) { e.target.checked = false; return; }
+                    try {
+                        const data = new Uint8Array([desired ? 1 : 0]);
+                        if (this.wiggleChar.writeValueWithoutResponse) await this.wiggleChar.writeValueWithoutResponse(data);
+                        else await this.wiggleChar.writeValue(data);
+                        this.wiggleActive = desired; // optimistic
+                    } catch (err) {
+                        console.warn('wiggle write failed', err);
+                        e.target.checked = this.wiggleActive;
+                    }
+                },
+            }
+        }).mount('#app');
+    </script>
+
+</body>
+
+</html>

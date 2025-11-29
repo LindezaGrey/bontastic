@@ -1,6 +1,5 @@
 #include "NimBLEDevice.h"
 #include "Arduino.h"
-#include "PrintHelpers.h"
 #include "src/protobufs/mesh.pb.h"
 #include "src/protobufs/portnums.pb.h"
 #include "src/nanopb/pb.h"
@@ -8,9 +7,11 @@
 #include "src/nanopb/pb_encode.h"
 
 #include "src/printer/PrintHelpers.h"
+#include "src/printer/PrinterControl.h"
 
 const char *targetName = "MO1_1dfd";
 const uint32_t targetPasskey = 123456;
+const char *localDeviceName = "Bontastic Printer";
 
 const char *targetService = "6ba1b218-15a8-461f-9fa8-5dcae273eafd";
 const char *uuidFromRadio = "2c55e69e-4993-11ed-b878-0242ac120002";
@@ -157,13 +158,14 @@ void setup()
 
   wantConfigId = millis() & 0xFFFF;
 
-  NimBLEDevice::init("");
+  NimBLEDevice::init(localDeviceName);
   NimBLEDevice::deleteAllBonds();
   Serial.println("Cleared bonds");
   NimBLEDevice::setMTU(512);
-  NimBLEDevice::setSecurityAuth(true, true, false);
+  NimBLEDevice::setSecurityAuth(false, false, false);
   NimBLEDevice::setSecurityIOCap(BLE_HS_IO_KEYBOARD_ONLY);
   NimBLEDevice::setSecurityPasskey(targetPasskey);
+  setupPrinterControl();
   NimBLEScan *scan = NimBLEDevice::getScan();
   scan->setActiveScan(true);
   NimBLEScanResults results = scan->getResults(5 * 1000, false);
@@ -300,6 +302,7 @@ void setup()
 
 void loop()
 {
+  printerControlLoop();
   if (fromRadioPending)
   {
     fromRadioPending = false;

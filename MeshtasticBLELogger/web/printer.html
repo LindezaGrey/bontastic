@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Printer Override Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"IBM Plex Mono"', '"Fira Code"', 'ui-monospace', 'SFMono-Regular', 'monospace']
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        :root {
+            --color-dark: #141414;
+            --color-neutral: #faf5f5;
+            --color-primary: #00ff00;
+            --color-secondary: #9673ff;
+            --color-additional-01: #ff3719;
+            --color-additional-02: #66f2ff;
+            --color-primary-tint-01: #009900;
+            --color-primary-tint-02: #00be00;
+            --color-primary-tint-03: #00d300;
+            --color-primary-tint-04: #00ea00;
+            --color-primary-tint-05: #a3ff90;
+            --color-primary-tint-06: #ccffbe;
+            --color-primary-tint-07: #ebffe5;
+            --color-secondary-tint-01: #4d2eed;
+            --color-secondary-tint-02: #5c33f4;
+            --color-secondary-tint-03: #7952fe;
+            --color-secondary-tint-04: #b69dfe;
+            --color-secondary-tint-05: #d4c4fe;
+            --color-secondary-tint-06: #efe7ff;
+        }
+
+        body {
+            background-color: #050505;
+            color: var(--color-primary-tint-05);
+            font-family: 'IBM Plex Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+            background-image: radial-gradient(circle at 1px 1px, #0f0f0f 1px, transparent 0), radial-gradient(circle at 3px 3px, #0d0d0d 1px, transparent 0);
+            background-size: 4px 4px;
+        }
+
+        .scanlines::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 3px, rgba(0, 0, 0, 0.2) 3px, rgba(0, 0, 0, 0.2) 4px);
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        .ghost-grid {
+            background-image: linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 0, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        input[type=range] {
+            accent-color: var(--color-primary);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen scanlines">
+    <div id="app" class="max-w-4xl mx-auto px-5 py-10 space-y-10 relative z-10">
+        <header
+            class="border border-green-500/40 bg-black/50 backdrop-blur-sm rounded-xl p-6 flex flex-col gap-5 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
+            <div class="flex flex-wrap gap-4 justify-between items-start">
+                <div>
+                    <p class="text-sm tracking-[0.4em] text-green-400/70">SYSTEM ONLINE</p>
+                    <h1 class="text-3xl md:text-4xl font-bold text-green-300">PRINTER_OVERRIDE</h1>
+                </div>
+                <div class="flex flex-col items-end text-xs uppercase text-green-300/80">
+                    <span>status :: {{ statusText }}</span>
+                    <span>device :: {{ connected ? 'linked' : 'idle' }}</span>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-4 items-center">
+                <button @click="connect" :disabled="connecting || connected"
+                    class="px-6 py-2 border border-green-400/60 bg-green-500/10 hover:bg-green-500/20 text-green-200 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    {{ connecting ? 'negotiating…' : 'establish link' }}
+                </button>
+                <button @click="disconnect" :disabled="!connected"
+                    class="px-6 py-2 border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-300 rounded transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    terminate
+                </button>
+                <span class="text-sm text-green-400/70">notify :: {{ notificationsEnabled ? 'on' : 'off' }}</span>
+            </div>
+        </header>
+
+        <main class="space-y-8">
+            <section class="grid gap-6 md:grid-cols-3">
+                <article
+                    class="ghost-grid border border-green-500/20 rounded-xl p-5 bg-black/40 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
+                    <header class="flex justify-between items-center text-green-300">
+                        <h2 class="text-lg tracking-wide">THERMAL CORE</h2>
+                        <span class="text-xs">{{ settings.temperature }}°C</span>
+                    </header>
+                    <div class="mt-6 space-y-4">
+                        <div class="flex justify-between text-xs text-green-400/70">
+                            <span>0°C</span>
+                            <span>300°C</span>
+                        </div>
+                        <input type="range" min="0" max="300" step="1" v-model.number="settings.temperature"
+                            @change="updateSetting('temperature')" :disabled="!connected"
+                            class="w-full accent-green-400">
+                        <p class="text-xs text-green-200/70">regulates nozzle heat envelope</p>
+                    </div>
+                </article>
+                <article
+                    class="ghost-grid border border-green-500/20 rounded-xl p-5 bg-black/40 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
+                    <header class="flex justify-between items-center text-green-300">
+                        <h2 class="text-lg tracking-wide">KINETIC FLOW</h2>
+                        <span class="text-xs">{{ settings.speed }} mm/s</span>
+                    </header>
+                    <div class="mt-6 space-y-4">
+                        <div class="flex justify-between text-xs text-green-400/70">
+                            <span>0</span>
+                            <span>200</span>
+                        </div>
+                        <input type="range" min="0" max="200" step="1" v-model.number="settings.speed"
+                            @change="updateSetting('speed')" :disabled="!connected">
+                        <p class="text-xs text-green-200/70">stage velocity modifier</p>
+                    </div>
+                </article>
+                <article
+                    class="ghost-grid border border-green-500/20 rounded-xl p-5 bg-black/40 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
+                    <header class="flex justify-between items-center text-green-300">
+                        <h2 class="text-lg tracking-wide">AIRFLOW VECTOR</h2>
+                        <span class="text-xs">{{ fanPercent }}%</span>
+                    </header>
+                    <div class="mt-6 space-y-4">
+                        <div class="flex justify-between text-xs text-green-400/70">
+                            <span>0%</span>
+                            <span>100%</span>
+                        </div>
+                        <input type="range" min="0" max="255" step="1" v-model.number="settings.fanSpeed"
+                            @change="updateSetting('fanSpeed')" :disabled="!connected">
+                        <p class="text-xs text-green-200/70">ducted cooling output</p>
+                    </div>
+                </article>
+            </section>
+
+            <section class="border border-green-500/20 rounded-xl bg-black/60 p-5 space-y-4">
+                <header class="flex items-center justify-between text-green-300">
+                    <h3 class="tracking-[0.3em] text-xs">TELEMETRY LOG</h3>
+                    <button @click="clearLog" class="text-xs text-green-400 hover:text-green-200">clear</button>
+                </header>
+                <ul class="space-y-2 max-h-48 overflow-auto pr-2 text-green-200/80 text-xs">
+                    <li v-for="entry in log" :key="entry.id" class="flex justify-between gap-4">
+                        <span>{{ entry.timestamp }}</span>
+                        <span>{{ entry.text }}</span>
+                    </li>
+                    <li v-if="!log.length" class="text-green-500/60">awaiting signals…</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const SERVICE_UUID = '5a1a0001-8f19-4a86-9a9e-7b4f7f9b0002';
+        const CHAR_UUID = {
+            temperature: '5a1a0002-8f19-4a86-9a9e-7b4f7f9b0002',
+            speed: '5a1a0003-8f19-4a86-9a9e-7b4f7f9b0002',
+            fanSpeed: '5a1a0004-8f19-4a86-9a9e-7b4f7f9b0002'
+        };
+
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        const app = {
+            data() {
+                return {
+                    device: null,
+                    server: null,
+                    service: null,
+                    characteristics: {},
+                    handlers: {},
+                    boundDisconnect: null,
+                    connected: false,
+                    connecting: false,
+                    notificationsEnabled: false,
+                    statusText: 'standby',
+                    settings: {
+                        temperature: 200,
+                        speed: 60,
+                        fanSpeed: 128
+                    },
+                    log: [],
+                    nextLogId: 0
+                };
+            },
+            computed: {
+                fanPercent() {
+                    return Math.round((this.settings.fanSpeed / 255) * 100);
+                }
+            },
+            methods: {
+                setStatus(text) {
+                    this.statusText = text;
+                    this.pushLog(text);
+                },
+                pushLog(text) {
+                    const stamp = new Date().toLocaleTimeString();
+                    this.log.unshift({ id: this.nextLogId++, timestamp: stamp, text });
+                    if (this.log.length > 50) {
+                        this.log.pop();
+                    }
+                },
+                clearLog() {
+                    this.log = [];
+                },
+                async connect() {
+                    if (!navigator.bluetooth) {
+                        alert('Web Bluetooth not supported in this browser.');
+                        return;
+                    }
+                    try {
+                        this.connecting = true;
+                        this.setStatus('scanning');
+                        this.device = await navigator.bluetooth.requestDevice({
+                            filters: [{ services: [SERVICE_UUID] }],
+                            optionalServices: [SERVICE_UUID]
+                        });
+                        this.boundDisconnect = this.handleGattDisconnect.bind(this);
+                        this.device.addEventListener('gattserverdisconnected', this.boundDisconnect);
+                        this.server = await this.device.gatt.connect();
+                        this.setStatus('link open');
+                        this.service = await this.server.getPrimaryService(SERVICE_UUID);
+                        await this.prepareCharacteristics();
+                        this.connected = true;
+                        this.setStatus('ready');
+                    } catch (err) {
+                        console.error(err);
+                        this.setStatus('connect failed');
+                        alert(err.message || err);
+                        await this.disconnect();
+                    } finally {
+                        this.connecting = false;
+                    }
+                },
+                async prepareCharacteristics() {
+                    this.characteristics = {};
+                    this.handlers = {};
+                    let notifyCount = 0;
+                    const entries = Object.entries(CHAR_UUID);
+                    for (const [key, uuid] of entries) {
+                        const characteristic = await this.service.getCharacteristic(uuid);
+                        this.characteristics[key] = characteristic;
+                        await this.readSetting(key);
+                        try {
+                            const handler = event => this.handleNotification(key, event);
+                            characteristic.addEventListener('characteristicvaluechanged', handler);
+                            await characteristic.startNotifications();
+                            this.handlers[key] = handler;
+                            notifyCount += 1;
+                        } catch (err) {
+                            console.warn('notify unsupported for', key, err);
+                        }
+                    }
+                    this.notificationsEnabled = notifyCount > 0;
+                },
+                async readSetting(key) {
+                    const characteristic = this.characteristics[key];
+                    if (!characteristic) {
+                        return;
+                    }
+                    const value = await characteristic.readValue();
+                    const parsed = this.parseValue(value);
+                    if (parsed !== null) {
+                        this.applySetting(key, parsed);
+                    }
+                },
+                parseValue(dataView) {
+                    try {
+                        const text = decoder.decode(dataView);
+                        const value = parseInt(text, 10);
+                        return Number.isFinite(value) ? value : null;
+                    } catch (err) {
+                        console.error('decode failed', err);
+                        return null;
+                    }
+                },
+                applySetting(key, value) {
+                    if (key === 'temperature') {
+                        this.settings.temperature = value;
+                    } else if (key === 'speed') {
+                        this.settings.speed = value;
+                    } else if (key === 'fanSpeed') {
+                        this.settings.fanSpeed = value;
+                    }
+                    this.pushLog(`${key} :: ${value}`);
+                },
+                handleNotification(key, event) {
+                    const parsed = this.parseValue(event.target.value);
+                    if (parsed !== null) {
+                        this.applySetting(key, parsed);
+                    }
+                },
+                async updateSetting(key) {
+                    if (!this.connected) {
+                        return;
+                    }
+                    const characteristic = this.characteristics[key];
+                    if (!characteristic) {
+                        return;
+                    }
+                    try {
+                        const payload = encoder.encode(String(this.settings[key]));
+                        await characteristic.writeValue(payload);
+                        this.pushLog(`set ${key} -> ${this.settings[key]}`);
+                    } catch (err) {
+                        console.error(err);
+                        this.setStatus('write error');
+                    }
+                },
+                async disconnect() {
+                    if (this.device && this.device.gatt.connected) {
+                        await this.device.gatt.disconnect();
+                    }
+                    this.resetLink('link closed');
+                },
+                handleGattDisconnect() {
+                    this.resetLink('link lost');
+                },
+                resetLink(label) {
+                    if (this.device && this.boundDisconnect) {
+                        try {
+                            this.device.removeEventListener('gattserverdisconnected', this.boundDisconnect);
+                        } catch (err) {
+                            console.warn('handler cleanup failed', err);
+                        }
+                    }
+                    this.boundDisconnect = null;
+                    Object.entries(this.characteristics).forEach(([key, characteristic]) => {
+                        const handler = this.handlers[key];
+                        if (handler) {
+                            try {
+                                characteristic.removeEventListener('characteristicvaluechanged', handler);
+                            } catch (err) {
+                                console.warn('remove handler failed', err);
+                            }
+                        }
+                    });
+                    this.handlers = {};
+                    this.characteristics = {};
+                    this.notificationsEnabled = false;
+                    this.connected = false;
+                    this.server = null;
+                    this.service = null;
+                    this.device = null;
+                    this.setStatus(label || 'link closed');
+                }
+            },
+            mounted() {
+                window.addEventListener('beforeunload', () => {
+                    if (this.device && this.device.gatt.connected) {
+                        this.device.gatt.disconnect();
+                    }
+                    this.resetLink('link closed');
+                });
+            }
+        };
+
+        Vue.createApp(app).mount('#app');
+    </script>
+</body>
+
+</html>
