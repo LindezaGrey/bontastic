@@ -16,13 +16,8 @@ void printerSetup()
 {
     const PrinterSettings &settings = getPrinterSettings();
     updatePrinterPins(settings.printerRxPin, settings.printerTxPin);
-    printer.setDefault(); // Restore printer to defaults
-    printer.setLineHeight(30);
-    printer.setSize('M'); // Set type size to Medium
-    printer.justify('C'); // Centered text
-    printer.print(F("Meshtastic"));
+    printer.print(F("Bontastic Printer Ready"));
     printer.feed(2);
-    printer.justify('L'); // Left justified text
 }
 
 std::string utf8ToIso88591(const std::string &utf8)
@@ -84,11 +79,11 @@ void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint
     printer.println(sender);
     printer.print(F("Time: "));
     printer.println(timeBuf);
-    printer.println(F("----------------"));
 
     std::string utf8((const char *)data, size);
     std::string iso = utf8ToIso88591(utf8);
     printer.println(iso.c_str());
+    printer.println(F("----------------"));
     printer.feed(2);
 }
 
