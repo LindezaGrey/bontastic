@@ -1,9 +1,9 @@
 #include "PrintHelpers.h"
-#include "Adafruit_Thermal.h"
+#include "Bontastic_Thermal.h"
 #include "PrinterControl.h"
 #include <time.h>
 
-Adafruit_Thermal printer(&Serial2);
+Bontastic_Thermal printer(&Serial2);
 
 void updatePrinterPins(int rx, int tx)
 {

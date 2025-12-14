@@ -5,10 +5,10 @@
 #include <Preferences.h>
 #include <string>
 #include "PrintHelpers.h"
-#include "Adafruit_Thermal.h"
+#include "Bontastic_Thermal.h"
 
 extern const char *localDeviceName;
-extern Adafruit_Thermal printer;
+extern Bontastic_Thermal printer;
 
 static const char *serviceUuid = "5a1a0001-8f19-4a86-9a9e-7b4f7f9b0002";
 static const char *fieldUuids[] = {
@@ -265,7 +265,7 @@ static uint16_t clampField(uint8_t field, int value)
     case JustifySelect:
         return constrain(value, 0, 2);
     case Decorations:
-        return constrain(value, 0, 15);
+        return constrain(value, 0, 31);
     case Feed:
         return constrain(value, 0, 50);
     case Charset:
@@ -350,6 +350,7 @@ static void applyPrinterConfig()
     bool inverse = printerSettings.decorations & 0x02;
     bool strike = printerSettings.decorations & 0x04;
     bool doubleWidth = printerSettings.decorations & 0x08;
+    bool upsideDown = printerSettings.decorations & 0x10;
     if (bold)
     {
         printer.boldOn();
@@ -381,6 +382,15 @@ static void applyPrinterConfig()
     else
     {
         printer.doubleWidthOff();
+    }
+
+    if (upsideDown)
+    {
+        printer.upsideDownOn();
+    }
+    else
+    {
+        printer.upsideDownOff();
     }
 }
 

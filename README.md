@@ -4,5 +4,5 @@ From mesh to paper
 
 ## Dependencies
 
-- [Adafruit Thermal Printer](https://github.com/adafruit/Adafruit-Thermal-Printer-Library)
+- In-tree ESC/POS printer driver: `Bontastic/src/printer/Bontastic_Thermal.*`
 - [NimBLE](https://github.com/h2zero/NimBLE-Arduino)

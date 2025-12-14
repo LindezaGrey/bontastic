@@ -73,7 +73,7 @@ Style Guide:
 ### Wire up real printer commands
 
 At the moment we only have mock-values we can control from the frontend. The goal is to control the REAL printer.
-Check the implementation of the firmware at:
+Reference implementation (not a dependency):
 
 https://github.com/adafruit/Adafruit-Thermal-Printer-Library/blob/master/Adafruit_Thermal.cpp
 
