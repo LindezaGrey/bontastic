@@ -245,6 +245,10 @@
                         class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100 text-sm focus:outline-none focus:border-green-400"
                         placeholder="Enter text to print..."></textarea>
                     <div class="flex justify-end">
+                        <button @click="sendPrintQr" :disabled="!connected || !printText"
+                            class="ml-3 px-6 py-2 font-mono border border-[--color-secondary-tint-02] hover:bg-[--color-secondary-tint-02] text-[--color-secondary] rounded transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            print qr
+                        </button>
                         <button @click="sendPrint" :disabled="!connected || !printText"
                             class="px-6 py-2 font-mono border border-green-400/60 bg-green-500/10 hover:bg-green-500/20 text-green-200 rounded transition disabled:opacity-40 disabled:cursor-not-allowed">
                             print text
@@ -520,7 +524,8 @@
             meshName: '5a1a0010-8f19-4a86-9a9e-7b4f7f9b0002',
             meshPin: '5a1a0011-8f19-4a86-9a9e-7b4f7f9b0002',
             printerRxPin: '5a1a0012-8f19-4a86-9a9e-7b4f7f9b0002',
-            printerTxPin: '5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002'
+            printerTxPin: '5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002',
+            printQr: '5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002'
         };
 
         const encoder = new TextEncoder();
@@ -710,6 +715,9 @@
                     for (const [key, uuid] of entries) {
                         const characteristic = await this.service.getCharacteristic(uuid);
                         this.characteristics[key] = characteristic;
+                        if (key === 'printText' || key === 'printQr') {
+                            continue;
+                        }
                         await this.readSetting(key);
                         try {
                             const handler = event => this.handleNotification(key, event);
@@ -804,6 +812,24 @@
                     } catch (err) {
                         console.error(err);
                         this.setStatus('print error');
+                    }
+                },
+                async sendPrintQr() {
+                    if (!this.connected || !this.printText) {
+                        return;
+                    }
+                    const characteristic = this.characteristics['printQr'];
+                    if (!characteristic) {
+                        return;
+                    }
+                    try {
+                        const payload = encoder.encode(this.printText);
+                        await characteristic.writeValue(payload);
+                        this.pushLog(`qr :: ${this.printText.length} chars`);
+                        this.printText = '';
+                    } catch (err) {
+                        console.error(err);
+                        this.setStatus('qr error');
                     }
                 },
                 async disconnect() {

@@ -29,7 +29,8 @@ static const char *fieldUuids[] = {
     "5a1a0010-8f19-4a86-9a9e-7b4f7f9b0002",
     "5a1a0011-8f19-4a86-9a9e-7b4f7f9b0002",
     "5a1a0012-8f19-4a86-9a9e-7b4f7f9b0002",
-    "5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002"};
+    "5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002",
+    "5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002"};
 
 enum SettingField : uint8_t
 {
@@ -51,6 +52,7 @@ enum SettingField : uint8_t
     MeshPin,
     PrinterRxPin,
     PrinterTxPin,
+    PrintQr,
     FieldCount
 };
 
@@ -103,6 +105,8 @@ static const char *fieldLabel(uint8_t field)
         return "PRINTER_RX";
     case PrinterTxPin:
         return "PRINTER_TX";
+    case PrintQr:
+        return "PRINT_QR";
     default:
         return nullptr;
     }
@@ -126,7 +130,8 @@ static const char *fieldKeys[] = {
     "meshName",
     "meshPin",
     "printerRxPin",
-    "printerTxPin"};
+    "printerTxPin",
+    nullptr};
 
 static void *fieldSlot(uint8_t field);
 
@@ -236,6 +241,7 @@ static void *fieldSlot(uint8_t field)
     case PrinterTxPin:
         return &printerSettings.printerTxPin;
     case PrintText:
+    case PrintQr:
         return nullptr;
     default:
         return nullptr;
@@ -276,6 +282,7 @@ static uint16_t clampField(uint8_t field, int value)
     case PrinterTxPin:
         return constrain(value, 0, 40);
     case PrintText:
+    case PrintQr:
         return 0;
     default:
         return value < 0 ? 0 : value;
@@ -394,6 +401,11 @@ static void applyPrinterConfig()
     }
 }
 
+void applyPrinterSettings()
+{
+    applyPrinterConfig();
+}
+
 static void applyFeed()
 {
     uint8_t rows = printerSettings.feedRows;
@@ -416,6 +428,16 @@ static void handleWrite(uint8_t field, const std::string &payload)
     {
         std::string iso = utf8ToIso88591(payload);
         printer.println(iso.c_str());
+        printer.feed(2);
+        return;
+    }
+    if (field == PrintQr)
+    {
+        printer.qrSelectModel(2);
+        printer.qrSetModuleSize(4);
+        printer.qrSetErrorCorrection(48);
+        printer.qrStoreData(reinterpret_cast<const uint8_t *>(payload.data()), payload.size());
+        printer.qrPrint();
         printer.feed(2);
         return;
     }
@@ -507,7 +529,14 @@ void setupPrinterControl()
     NimBLEService *service = printerServer->createService(serviceUuid);
     for (uint8_t i = 0; i < FieldCount; ++i)
     {
-        characteristics[i] = service->createCharacteristic(fieldUuids[i], NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+        if (i == PrintText || i == PrintQr)
+        {
+            characteristics[i] = service->createCharacteristic(fieldUuids[i], NIMBLE_PROPERTY::WRITE);
+        }
+        else
+        {
+            characteristics[i] = service->createCharacteristic(fieldUuids[i], NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+        }
         characteristics[i]->setCallbacks(new SettingCallbacks(i));
     }
     service->start();

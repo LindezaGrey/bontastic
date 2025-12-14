@@ -279,44 +279,51 @@ void Bontastic_Thermal::gsK(uint8_t cn, uint8_t fn, const uint8_t *data, size_t 
 
 void Bontastic_Thermal::qrSelectModel(uint8_t model)
 {
-    uint8_t data[3] = {0x31, model, 0x00};
-    gsK(0x31, 0x65, data, sizeof(data));
+    if (model < 48)
+    {
+        model = (uint8_t)(48 + model);
+    }
+    uint8_t args[2] = {model, 0x00};
+    gsK(0x31, 65, args, sizeof(args));
 }
 
 void Bontastic_Thermal::qrSetModuleSize(uint8_t n)
 {
-    uint8_t data[2] = {0x31, n};
-    gsK(0x31, 0x67, data, sizeof(data));
+    uint8_t args[1] = {n};
+    gsK(0x31, 67, args, sizeof(args));
 }
 
 void Bontastic_Thermal::qrSetErrorCorrection(uint8_t n)
 {
-    uint8_t data[2] = {0x31, n};
-    gsK(0x31, 0x69, data, sizeof(data));
+    if (n < 48)
+    {
+        n = (uint8_t)(48 + n);
+    }
+    uint8_t args[1] = {n};
+    gsK(0x31, 69, args, sizeof(args));
 }
 
 void Bontastic_Thermal::qrStoreData(const uint8_t *data, size_t len)
 {
-    uint8_t hdr[3] = {0x31, (uint8_t)(len & 0xFF), (uint8_t)(len >> 8)};
-    uint16_t p = (uint16_t)(len + sizeof(hdr) + 2);
+    uint16_t p = (uint16_t)(len + 1 + 2);
     uint8_t pL = (uint8_t)(p & 0xFF);
     uint8_t pH = (uint8_t)(p >> 8);
     writeBytes(ASCII_GS, '(', 'k', pL);
-    writeBytes(pH, 0x31, 0x80);
-    writeN(hdr, sizeof(hdr));
+    writeBytes(pH, 0x31, 80);
+    writeBytes(0x30);
     writeN(data, len);
 }
 
 void Bontastic_Thermal::qrPrint()
 {
-    uint8_t data[1] = {0x30};
-    gsK(0x31, 0x81, data, sizeof(data));
+    uint8_t args[1] = {0x30};
+    gsK(0x31, 81, args, sizeof(args));
 }
 
 void Bontastic_Thermal::qrSelectDataType(uint8_t n)
 {
-    uint8_t data[2] = {0x31, n};
-    gsK(0x31, 0x82, data, sizeof(data));
+    uint8_t args[1] = {n};
+    gsK(0x31, 82, args, sizeof(args));
 }
 
 void Bontastic_Thermal::chineseModeOn() { writeBytes(ASCII_FS, '&'); }

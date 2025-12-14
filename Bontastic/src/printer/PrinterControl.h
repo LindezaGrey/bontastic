@@ -26,3 +26,4 @@ struct PrinterSettings
 void setupPrinterControl();
 void printerControlLoop();
 const PrinterSettings &getPrinterSettings();
+void applyPrinterSettings();

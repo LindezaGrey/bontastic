@@ -10,6 +10,7 @@ void updatePrinterPins(int rx, int tx)
     Serial2.end();
     Serial2.begin(9600, SERIAL_8N1, rx, tx);
     printer.begin();
+    applyPrinterSettings();
 }
 
 void printerSetup()
