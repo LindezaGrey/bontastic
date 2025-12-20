@@ -166,9 +166,9 @@ void setup()
 {
   Serial.begin(115200);
 
-  while (!Serial)
-  {
-  }
+  // while (!Serial)
+  //{
+  //}
   Serial.println("Lets Go");
 
   wantConfigId = millis() & 0xFFFF;
