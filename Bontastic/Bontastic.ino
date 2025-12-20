@@ -9,6 +9,11 @@
 #include "src/printer/PrintHelpers.h"
 #include "src/printer/PrinterControl.h"
 
+#define ENABLE_CONTEST_QR_MODULE
+#ifdef ENABLE_CONTEST_QR_MODULE
+#include "src/printer/ContestQrModule.h"
+#endif
+
 #include <map>
 #include <string>
 
@@ -176,6 +181,13 @@ void setup()
   NimBLEDevice::init(localDeviceName);
   setupPrinterControl();
   printerSetup();
+
+#ifdef ENABLE_CONTEST_QR_MODULE
+  contestQrSetup();
+  contestQrSetIntervalMinutes(5);
+  contestQrSetContent("https://example.com");
+#endif
+
   NimBLEDevice::deleteAllBonds();
   Serial.println("Cleared bonds");
   NimBLEDevice::setMTU(512);
@@ -321,6 +333,11 @@ void setup()
 void loop()
 {
   printerControlLoop();
+
+#ifdef ENABLE_CONTEST_QR_MODULE
+  contestQrLoop();
+#endif
+
   if (fromRadioPending)
   {
     fromRadioPending = false;
