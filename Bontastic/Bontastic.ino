@@ -103,7 +103,7 @@ void decodeFromRadioPacket(const std::string &packet)
       pb_istream_t ns = pb_istream_from_buffer(d.payload.bytes, d.payload.size);
       if (pb_decode(&ns, meshtastic_User_fields, &user))
       {
-        printNodeInfo(msg.packet.from, user.long_name);
+        // printNodeInfo(msg.packet.from, user.long_name);
         nodeNames[msg.packet.from] = user.long_name;
       }
       else
