@@ -185,7 +185,7 @@ void setup()
 #ifdef ENABLE_CONTEST_QR_MODULE
   contestQrSetup();
   contestQrSetIntervalMinutes(5);
-  contestQrSetContent("https://example.com");
+  contestQrSetContent("tALaJ2r35ygij1KCB3PvxSCl609Tajv4XYhMEscw7JY=");
 #endif
 
   NimBLEDevice::deleteAllBonds();
