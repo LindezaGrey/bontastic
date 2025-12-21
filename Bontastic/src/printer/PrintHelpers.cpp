@@ -1,6 +1,7 @@
 #include "PrintHelpers.h"
 #include "Bontastic_Thermal.h"
 #include "PrinterControl.h"
+#include "assets/bontastic.h"
 #include <time.h>
 
 Bontastic_Thermal printer(&Serial2);
@@ -17,7 +18,9 @@ void printerSetup()
 {
     const PrinterSettings &settings = getPrinterSettings();
     updatePrinterPins(settings.printerRxPin, settings.printerTxPin);
-    printer.print(F("Bontastic Printer Ready"));
+
+    Serial.println("Startup bitmap print");
+    printer.gsV0(0, bontastic_width / 8, bontastic_height, bontastic_data, sizeof(bontastic_data));
     printer.feed(2);
 }
 
