@@ -77,14 +77,23 @@ void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint
 
     printer.println(F("----------------"));
     printer.print(F("From: "));
+    bool inverse = getPrinterSettings().decorations & 0x02;
+    if (inverse)
+    {
+        printer.inverseOff();
+    }
+    else
+    {
+        printer.inverseOn();
+    }
     printer.println(sender);
+    applyPrinterSettings();
     printer.print(F("Time: "));
     printer.println(timeBuf);
 
     std::string utf8((const char *)data, size);
     std::string iso = utf8ToIso88591(utf8);
     printer.println(iso.c_str());
-    printer.println(F("----------------"));
     printer.feed(2);
 }
 

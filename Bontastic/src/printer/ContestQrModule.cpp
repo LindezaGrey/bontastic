@@ -4,6 +4,7 @@
 #include <string>
 
 #include "Bontastic_Thermal.h"
+#include "PrinterControl.h"
 
 extern Bontastic_Thermal printer;
 
@@ -39,12 +40,15 @@ void contestQrLoop()
         return;
     }
 
+    printer.justify('C');
     printer.qrSelectModel(2);
     printer.qrSetModuleSize(4);
     printer.qrSetErrorCorrection(48);
     printer.qrStoreData(reinterpret_cast<const uint8_t *>(content.data()), content.size());
     printer.qrPrint();
+    printer.println(F("Hint for the badge"));
     printer.feed(2);
+    applyPrinterSettings();
 
     nextAt = now + intervalMs;
 }

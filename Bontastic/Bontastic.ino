@@ -42,6 +42,8 @@ static volatile bool fromRadioPending;
 static const int maxNotifyQueue = 8;
 static volatile int notifyQueueCount;
 
+volatile bool meshtasticConnected;
+
 bool readFromRadioPacket(std::string &packet)
 {
   packet = fromRadio->readValue();
@@ -146,11 +148,13 @@ class ClientCallbacks : public NimBLEClientCallbacks
 {
   void onConnect(NimBLEClient *) override
   {
+    meshtasticConnected = true;
     Serial.println("Connected");
   }
 
   void onDisconnect(NimBLEClient *, int) override
   {
+    meshtasticConnected = false;
     Serial.println("Disconnected");
   }
 

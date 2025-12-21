@@ -197,6 +197,17 @@
                 class="border border-green-500/20 rounded-xl bg-black/40 p-5 space-y-4 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
                 <header class="flex justify-between items-center text-green-300">
                     <h2 class="text-lg font-mono tracking-wide">MESHTASTIC LINK</h2>
+                    <div class="flex items-center gap-2 text-xs font-mono">
+                        <span class="text-green-400/70 uppercase">status</span>
+                        <span class="relative flex h-3 w-3">
+                            <span v-if="meshConnected"
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[--color-primary] opacity-60"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3"
+                                :class="meshConnected ? 'bg-[--color-primary]' : 'bg-[--color-secondary]'">
+                            </span>
+                        </span>
+                        <span :class="`${meshConnected ? 'text-[--color-primary]' : 'text-[--color-secondary]'}`">{{ meshConnected ? 'connected' : 'waiting' }}</span>
+                    </div>
                 </header>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div class="space-y-2">
@@ -246,7 +257,7 @@
                         placeholder="Enter text to print..."></textarea>
                     <div class="flex justify-end">
                         <button @click="sendPrintQr" :disabled="!connected || !printText"
-                            class="ml-3 px-6 py-2 font-mono border border-[--color-secondary-tint-02] hover:bg-[--color-secondary-tint-02] text-[--color-secondary] rounded transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            class="mr-3 px-6 py-2 font-mono border border-[--color-secondary-tint-02] hover:bg-[--color-secondary-tint-02] text-[--color-secondary] rounded transition disabled:opacity-40 disabled:cursor-not-allowed">
                             print qr
                         </button>
                         <button @click="sendPrint" :disabled="!connected || !printText"
@@ -525,7 +536,8 @@
             meshPin: '5a1a0011-8f19-4a86-9a9e-7b4f7f9b0002',
             printerRxPin: '5a1a0012-8f19-4a86-9a9e-7b4f7f9b0002',
             printerTxPin: '5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002',
-            printQr: '5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002'
+            printQr: '5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002',
+            meshConnected: '5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002'
         };
 
         const encoder = new TextEncoder();
@@ -544,6 +556,7 @@
                     connecting: false,
                     notificationsEnabled: false,
                     statusText: 'standby',
+                    meshConnected: false,
                     settings: {
                         heatDots: 11,
                         heatTime: 120,
@@ -756,6 +769,11 @@
                     }
                 },
                 applySetting(key, value) {
+                    if (key === 'meshConnected') {
+                        this.meshConnected = !!value;
+                        this.pushLog(`meshtastic :: ${this.meshConnected ? 'connected' : 'waiting'}`);
+                        return;
+                    }
                     if (Object.prototype.hasOwnProperty.call(this.settings, key)) {
                         this.settings[key] = value;
                     }

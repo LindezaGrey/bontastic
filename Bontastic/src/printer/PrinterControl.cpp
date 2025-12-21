@@ -9,6 +9,7 @@
 
 extern const char *localDeviceName;
 extern Bontastic_Thermal printer;
+extern volatile bool meshtasticConnected;
 
 static const char *serviceUuid = "5a1a0001-8f19-4a86-9a9e-7b4f7f9b0002";
 static const char *fieldUuids[] = {
@@ -58,12 +59,29 @@ enum SettingField : uint8_t
 
 static const uint16_t printerAppearance = 0x03C0;
 
+static const char *meshLinkUuid = "5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002";
+
 static NimBLEServer *printerServer;
 static NimBLECharacteristic *characteristics[FieldCount];
+static NimBLECharacteristic *meshLinkCharacteristic;
+static bool lastMeshLink;
 static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, 2, 23, "MO1_1dfd", "123456", 1, 2};
 static PrinterSettings printerSettings = defaultSettings;
 static Preferences printerPrefs;
 static bool prefsReady;
+
+static void syncMeshLink(bool notify)
+{
+    if (!meshLinkCharacteristic)
+    {
+        return;
+    }
+    meshLinkCharacteristic->setValue(meshtasticConnected ? "1" : "0");
+    if (notify)
+    {
+        meshLinkCharacteristic->notify();
+    }
+}
 
 static const char *fieldLabel(uint8_t field)
 {
@@ -539,6 +557,10 @@ void setupPrinterControl()
         }
         characteristics[i]->setCallbacks(new SettingCallbacks(i));
     }
+
+    meshLinkCharacteristic = service->createCharacteristic(meshLinkUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    lastMeshLink = meshtasticConnected;
+    syncMeshLink(false);
     service->start();
     loadSettings();
     applyPrinterConfig();
@@ -563,6 +585,12 @@ void setupPrinterControl()
 
 void printerControlLoop()
 {
+    bool linked = meshtasticConnected;
+    if (linked != lastMeshLink)
+    {
+        lastMeshLink = linked;
+        syncMeshLink(true);
+    }
 }
 
 const PrinterSettings &getPrinterSettings()
