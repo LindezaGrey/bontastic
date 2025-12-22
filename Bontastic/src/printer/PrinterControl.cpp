@@ -84,6 +84,44 @@ static uint8_t bitmapHeader[8];
 static uint8_t bitmapHeaderReceived;
 static uint32_t bitmapLastLog;
 
+static uint8_t reverseBits(uint8_t b)
+{
+    b = (uint8_t)((b & 0xF0) >> 4) | (uint8_t)((b & 0x0F) << 4);
+    b = (uint8_t)((b & 0xCC) >> 2) | (uint8_t)((b & 0x33) << 2);
+    b = (uint8_t)((b & 0xAA) >> 1) | (uint8_t)((b & 0x55) << 1);
+    return b;
+}
+
+static void gsV0WithUpsideDown(uint16_t widthBytes, uint16_t height, const uint8_t *data, size_t len, bool upsideDown)
+{
+    if (!data || !len)
+    {
+        return;
+    }
+    size_t expected = (size_t)widthBytes * (size_t)height;
+    if (!upsideDown || len != expected)
+    {
+        printer.gsV0(0, widthBytes, height, data, len);
+        return;
+    }
+
+    std::string flipped;
+    flipped.resize(len);
+    const size_t rowBytes = widthBytes;
+    for (uint16_t y = 0; y < height; y++)
+    {
+        size_t srcRow = (size_t)(height - 1 - y) * rowBytes;
+        size_t dstRow = (size_t)y * rowBytes;
+        for (uint16_t xb = 0; xb < widthBytes; xb++)
+        {
+            uint8_t v = data[srcRow + (rowBytes - 1 - xb)];
+            flipped[dstRow + xb] = (char)reverseBits(v);
+        }
+    }
+
+    printer.gsV0(0, widthBytes, height, reinterpret_cast<const uint8_t *>(flipped.data()), flipped.size());
+}
+
 static void handleBitmapChunk(const uint8_t *data, size_t len)
 {
     if (!data || len == 0)
@@ -144,8 +182,9 @@ static void handleBitmapChunk(const uint8_t *data, size_t len)
     if (bitmapReceived == bitmapExpected)
     {
         bleLog("BMP print");
-        printer.gsV0(0, bitmapWidth / 8, bitmapHeight,
-                     reinterpret_cast<const uint8_t *>(bitmapBuffer.data()), bitmapBuffer.size());
+        bool upsideDown = (printerSettings.decorations & 0x10) != 0;
+        gsV0WithUpsideDown(bitmapWidth / 8, bitmapHeight,
+                           reinterpret_cast<const uint8_t *>(bitmapBuffer.data()), bitmapBuffer.size(), upsideDown);
         printer.feed(2);
         bleLog("BMP done");
         bitmapExpected = 0;
