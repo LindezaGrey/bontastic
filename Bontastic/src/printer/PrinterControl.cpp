@@ -91,6 +91,15 @@ static void handleBitmapChunk(const uint8_t *data, size_t len)
         return;
     }
 
+    if (bitmapExpected != 0 && len >= 2 && data[0] == 0x42 && data[1] == 0x4d)
+    {
+        bleLog("BMP restart");
+        bitmapExpected = 0;
+        bitmapReceived = 0;
+        bitmapHeaderReceived = 0;
+        bitmapBuffer.clear();
+    }
+
     if (bitmapExpected == 0)
     {
         while (bitmapHeaderReceived < sizeof(bitmapHeader) && len > 0)
@@ -130,12 +139,6 @@ static void handleBitmapChunk(const uint8_t *data, size_t len)
     {
         bitmapBuffer.append(reinterpret_cast<const char *>(data), take);
         bitmapReceived += take;
-    }
-
-    if (bitmapReceived - bitmapLastLog >= 2048)
-    {
-        bitmapLastLog = bitmapReceived;
-        bleLogf("BMP %lu/%lu", (unsigned long)bitmapReceived, (unsigned long)bitmapExpected);
     }
 
     if (bitmapReceived == bitmapExpected)

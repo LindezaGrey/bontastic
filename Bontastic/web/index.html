@@ -260,12 +260,23 @@
                             class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100 text-sm focus:outline-none focus:border-green-400">
                     </div>
                     <div class="space-y-2">
-                        <label class="text-xs text-green-400/70 uppercase">Dither</label>
-                        <select v-model="bitmapDither"
-                            class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-3 text-green-100 text-sm focus:outline-none focus:border-green-400">
-                            <option :value="true">on</option>
-                            <option :value="false">off</option>
-                        </select>
+                        <label class="text-xs text-green-400/70 uppercase">Effects</label>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="cursor-pointer">
+                                <input type="checkbox" value="dither" v-model="bitmapEffects" class="sr-only peer">
+                                <span
+                                    class="block px-3 py-2 font-mono text-sm border border-green-500/40 rounded-xl bg-black/60 text-green-200/90 peer-checked:border-green-400/70 peer-checked:bg-green-500/15">
+                                    dither
+                                </span>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" value="invert" v-model="bitmapEffects" class="sr-only peer">
+                                <span
+                                    class="block px-3 py-2 font-mono text-sm border border-green-500/40 rounded-xl bg-black/60 text-green-200/90 peer-checked:border-green-400/70 peer-checked:bg-green-500/15">
+                                    invert
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="flex gap-4 items-center">
@@ -291,6 +302,18 @@
                         <label class="text-xs text-green-400/70 uppercase">Bytes (head)</label>
                         <pre
                             class="border border-green-500/30 rounded bg-black/60 p-2 text-xs font-mono text-green-200/80 whitespace-pre-wrap">{{ bitmapHex }}</pre>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-mono text-green-400/70">
+                        <span>progress</span>
+                        <span>{{ Math.round(bitmapProgress * 100) }}% {{ bitmapProgressText }}</span>
+                    </div>
+                    <div class="h-2 rounded border border-[--color-secondary] bg-black/60 overflow-hidden">
+                        <div class="h-full bg-[--color-secondary]"
+                            :style="{ width: `${Math.round(bitmapProgress * 100)}%` }">
+                        </div>
                     </div>
                 </div>
             </section>
@@ -631,10 +654,12 @@
                     },
                     printText: '',
                     bitmapFile: null,
-                    bitmapDither: true,
+                    bitmapEffects: ['dither'],
                     bitmapBusy: false,
                     bitmapInfo: '',
                     bitmapHex: '',
+                    bitmapProgress: 0,
+                    bitmapProgressText: '',
                     decorationOptions: [
                         { value: 0, label: 'none' },
                         { value: 1, label: 'bold' },
@@ -894,7 +919,7 @@
                     try {
                         this.bitmapBusy = true;
                         this.setStatus('encoding');
-                        const encoded = await window.bontasticBitmap.encodeBitmapFromFile(this.bitmapFile, { dither: this.bitmapDither });
+                        const encoded = await window.bontasticBitmap.encodeBitmapFromFile(this.bitmapFile, { effects: this.bitmapEffects });
                         this.bitmapInfo = `${encoded.width}x${encoded.height} :: ${encoded.bytes.length} bytes`;
                         this.bitmapHex = window.bontasticBitmap.hexPreview(encoded.bytes, 128);
                         window.bontasticBitmap.drawEncodedToCanvas(encoded, this.$refs.bitmapCanvas);
@@ -913,13 +938,22 @@
                     }
                     try {
                         this.bitmapBusy = true;
+                        this.bitmapProgress = 0;
+                        this.bitmapProgressText = '';
                         this.setStatus('encoding');
-                        const encoded = await window.bontasticBitmap.encodeBitmapFromFile(this.bitmapFile, { dither: this.bitmapDither });
+                        const encoded = await window.bontasticBitmap.encodeBitmapFromFile(this.bitmapFile, { effects: this.bitmapEffects });
                         this.bitmapInfo = `${encoded.width}x${encoded.height} :: ${encoded.bytes.length} bytes`;
                         this.bitmapHex = window.bontasticBitmap.hexPreview(encoded.bytes, 128);
                         window.bontasticBitmap.drawEncodedToCanvas(encoded, this.$refs.bitmapCanvas);
                         this.setStatus('sending bitmap');
-                        await window.bontasticBitmap.sendBitmap(characteristic, encoded);
+                        await window.bontasticBitmap.sendBitmap(characteristic, encoded, 20, {
+                            onProgress: (sent, total) => {
+                                const p = total ? sent / total : 0;
+                                this.bitmapProgress = Math.max(0, Math.min(1, p));
+                                this.bitmapProgressText = `${sent}/${total} bytes`;
+                            }
+                        });
+                        this.bitmapProgress = 1;
                         this.setStatus('printed');
                     } finally {
                         this.bitmapBusy = false;

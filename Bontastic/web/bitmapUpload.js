@@ -31,7 +31,9 @@
     }
 
     async function encodeBitmapFromFile(file, opts) {
-        const dither = !!(opts && opts.dither);
+        const effects = (opts && Array.isArray(opts.effects)) ? opts.effects : null;
+        const dither = effects ? effects.includes('dither') : !!(opts && opts.dither);
+        const invert = effects ? effects.includes('invert') : !!(opts && opts.invert);
         const bmp = await loadImageBitmap(file);
 
         const scale = TARGET_WIDTH / bmp.width;
@@ -60,7 +62,7 @@
                     const b = data[i + 2];
                     const gray = (r * 0.299 + g * 0.587 + b * 0.114);
                     const t = dither ? ((BAYER_4[y & 3][x & 3] + 0.5) / 16) * 255 : 128;
-                    const black = gray < t;
+                    const black = invert ? !(gray < t) : (gray < t);
                     if (black) {
                         byte |= 1 << (7 - bit);
                     }
@@ -116,18 +118,29 @@
         return out.trim();
     }
 
-    async function writeInChunks(characteristic, bytes, chunkSize) {
+    async function writeInChunks(characteristic, bytes, chunkSize, opts) {
+        const forceResponse = !!(opts && opts.forceResponse);
+        const delayMs = (opts && opts.delayMs) ? opts.delayMs : 0;
+        const onProgress = (opts && typeof opts.onProgress === 'function') ? opts.onProgress : null;
+
         const canWriteWithoutResponse = !!(characteristic && characteristic.properties && characteristic.properties.writeWithoutResponse);
-        const write = (canWriteWithoutResponse && characteristic.writeValueWithoutResponse)
+        const write = (!forceResponse && canWriteWithoutResponse && characteristic.writeValueWithoutResponse)
             ? characteristic.writeValueWithoutResponse.bind(characteristic)
             : characteristic.writeValue.bind(characteristic);
 
         for (let i = 0; i < bytes.length; i += chunkSize) {
-            await write(bytes.slice(i, i + chunkSize));
+            const chunk = bytes.slice(i, i + chunkSize);
+            await write(chunk);
+            if (onProgress) {
+                onProgress(Math.min(i + chunk.length, bytes.length), bytes.length);
+            }
+            if (delayMs) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
         }
     }
 
-    async function sendBitmap(characteristic, encoded, chunkSize) {
+    async function sendBitmap(characteristic, encoded, chunkSize, opts) {
         const expected = encoded.bytes.length;
         const header = new Uint8Array(8);
         header[0] = 0x42;
@@ -143,7 +156,11 @@
         packet.set(header, 0);
         packet.set(encoded.bytes, header.length);
 
-        await writeInChunks(characteristic, packet, chunkSize || 20);
+        await writeInChunks(characteristic, packet, chunkSize || 20, {
+            forceResponse: true,
+            onProgress: opts && opts.onProgress,
+            delayMs: (opts && opts.delayMs) ? opts.delayMs : 0,
+        });
     }
 
     window.bontasticBitmap = {

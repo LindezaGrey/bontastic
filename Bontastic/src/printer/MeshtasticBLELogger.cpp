@@ -18,7 +18,8 @@ void bleLog(const char *msg)
     {
         return;
     }
-    logCharacteristic->setValue(msg);
+    size_t n = strnlen(msg, 240);
+    logCharacteristic->setValue(reinterpret_cast<const uint8_t *>(msg), n);
     logCharacteristic->notify();
 }
 
@@ -29,12 +30,14 @@ void bleLogf(const char *fmt, ...)
         return;
     }
 
-    char buf[192];
+    char buf[192] = {0};
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
 
-    logCharacteristic->setValue(buf);
+    buf[sizeof(buf) - 1] = 0;
+    size_t n = strnlen(buf, sizeof(buf));
+    logCharacteristic->setValue(reinterpret_cast<const uint8_t *>(buf), n);
     logCharacteristic->notify();
 }
