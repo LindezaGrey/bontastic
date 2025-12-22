@@ -206,7 +206,8 @@
                                 :class="meshConnected ? 'bg-[--color-primary]' : 'bg-[--color-secondary]'">
                             </span>
                         </span>
-                        <span :class="`${meshConnected ? 'text-[--color-primary]' : 'text-[--color-secondary]'}`">{{ meshConnected ? 'connected' : 'waiting' }}</span>
+                        <span :class="`${meshConnected ? 'text-[--color-primary]' : 'text-[--color-secondary]'}`">{{
+                            meshConnected ? 'connected' : 'waiting' }}</span>
                     </div>
                 </header>
                 <div class="grid gap-4 md:grid-cols-2">
@@ -242,6 +243,54 @@
                         <input type="number" v-model.number="settings.printerTxPin"
                             @change="updateSetting('printerTxPin')" :disabled="!connected"
                             class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100 text-sm focus:outline-none focus:border-green-400">
+                    </div>
+                </div>
+            </section>
+
+            <section
+                class="border border-green-500/20 rounded-xl bg-black/40 p-5 space-y-4 shadow-[0_0_30px_rgba(0,255,0,0.08)]">
+                <header class="flex justify-between items-center text-green-300">
+                    <h2 class="text-lg font-mono tracking-wide">BITMAP PRINT</h2>
+                    <span class="text-xs font-mono text-green-400/70">384px wide</span>
+                </header>
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div class="space-y-2">
+                        <label class="text-xs text-green-400/70 uppercase">Image</label>
+                        <input type="file" accept="image/*" @change="onBitmapFile"
+                            class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100 text-sm focus:outline-none focus:border-green-400">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-green-400/70 uppercase">Dither</label>
+                        <select v-model="bitmapDither"
+                            class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-3 text-green-100 text-sm focus:outline-none focus:border-green-400">
+                            <option :value="true">on</option>
+                            <option :value="false">off</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-4 items-center">
+                    <button @click="sendBitmap" :disabled="!connected || !bitmapFile || bitmapBusy"
+                        class="px-6 py-2 font-mono border border-green-400/60 bg-green-500/10 hover:bg-green-500/20 text-green-200 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        {{ bitmapBusy ? 'sending…' : 'print image' }}
+                    </button>
+                    <button @click="debugBitmap" :disabled="!bitmapFile || bitmapBusy"
+                        class="px-6 py-2 font-mono border border-green-500/30 bg-black/40 hover:bg-green-500/10 text-green-200 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        {{ bitmapBusy ? 'encoding…' : 'encode only' }}
+                    </button>
+                    <span class="text-xs font-mono text-green-400/70">{{ bitmapInfo }}</span>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div class="space-y-2">
+                        <label class="text-xs text-green-400/70 uppercase">Preview</label>
+                        <div class="border border-green-500/30 rounded bg-black/60 p-2 overflow-auto">
+                            <canvas ref="bitmapCanvas" class="block"></canvas>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-green-400/70 uppercase">Bytes (head)</label>
+                        <pre
+                            class="border border-green-500/30 rounded bg-black/60 p-2 text-xs font-mono text-green-200/80 whitespace-pre-wrap">{{ bitmapHex }}</pre>
                     </div>
                 </div>
             </section>
@@ -515,6 +564,8 @@
         </main>
     </div>
 
+    <script src="bitmapUpload.js"></script>
+
     <script>
         const SERVICE_UUID = '5a1a0001-8f19-4a86-9a9e-7b4f7f9b0002';
         const CHAR_UUID = {
@@ -537,7 +588,9 @@
             printerRxPin: '5a1a0012-8f19-4a86-9a9e-7b4f7f9b0002',
             printerTxPin: '5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002',
             printQr: '5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002',
-            meshConnected: '5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002'
+            meshConnected: '5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002',
+            bitmap: '5a1a0016-8f19-4a86-9a9e-7b4f7f9b0002',
+            log: '5a1a0017-8f19-4a86-9a9e-7b4f7f9b0002'
         };
 
         const encoder = new TextEncoder();
@@ -577,6 +630,11 @@
                         printerTxPin: 2
                     },
                     printText: '',
+                    bitmapFile: null,
+                    bitmapDither: true,
+                    bitmapBusy: false,
+                    bitmapInfo: '',
+                    bitmapHex: '',
                     decorationOptions: [
                         { value: 0, label: 'none' },
                         { value: 1, label: 'bold' },
@@ -728,10 +786,12 @@
                     for (const [key, uuid] of entries) {
                         const characteristic = await this.service.getCharacteristic(uuid);
                         this.characteristics[key] = characteristic;
-                        if (key === 'printText' || key === 'printQr') {
+                        if (key === 'printText' || key === 'printQr' || key === 'bitmap') {
                             continue;
                         }
-                        await this.readSetting(key);
+                        if (key !== 'log') {
+                            await this.readSetting(key);
+                        }
                         try {
                             const handler = event => this.handleNotification(key, event);
                             characteristic.addEventListener('characteristicvaluechanged', handler);
@@ -785,6 +845,13 @@
                     }
                 },
                 handleNotification(key, event) {
+                    if (key === 'log') {
+                        const text = decoder.decode(event.target.value).replace(/\0/g, '').trim();
+                        if (text) {
+                            this.pushLog(text);
+                        }
+                        return;
+                    }
                     const parsed = this.parseValue(event.target.value, key);
                     if (parsed !== null) {
                         this.applySetting(key, parsed);
@@ -813,6 +880,50 @@
                     }
                     await this.updateSetting('feed');
                     this.settings.feed = 0;
+                },
+                onBitmapFile(event) {
+                    const file = event.target.files && event.target.files[0];
+                    this.bitmapFile = file || null;
+                    this.bitmapInfo = file ? file.name : '';
+                    this.bitmapHex = '';
+                },
+                async debugBitmap() {
+                    if (!this.bitmapFile || !window.bontasticBitmap) {
+                        return;
+                    }
+                    try {
+                        this.bitmapBusy = true;
+                        this.setStatus('encoding');
+                        const encoded = await window.bontasticBitmap.encodeBitmapFromFile(this.bitmapFile, { dither: this.bitmapDither });
+                        this.bitmapInfo = `${encoded.width}x${encoded.height} :: ${encoded.bytes.length} bytes`;
+                        this.bitmapHex = window.bontasticBitmap.hexPreview(encoded.bytes, 128);
+                        window.bontasticBitmap.drawEncodedToCanvas(encoded, this.$refs.bitmapCanvas);
+                        this.setStatus('encoded');
+                    } finally {
+                        this.bitmapBusy = false;
+                    }
+                },
+                async sendBitmap() {
+                    if (!this.connected || !this.bitmapFile) {
+                        return;
+                    }
+                    const characteristic = this.characteristics.bitmap;
+                    if (!characteristic || !window.bontasticBitmap) {
+                        return;
+                    }
+                    try {
+                        this.bitmapBusy = true;
+                        this.setStatus('encoding');
+                        const encoded = await window.bontasticBitmap.encodeBitmapFromFile(this.bitmapFile, { dither: this.bitmapDither });
+                        this.bitmapInfo = `${encoded.width}x${encoded.height} :: ${encoded.bytes.length} bytes`;
+                        this.bitmapHex = window.bontasticBitmap.hexPreview(encoded.bytes, 128);
+                        window.bontasticBitmap.drawEncodedToCanvas(encoded, this.$refs.bitmapCanvas);
+                        this.setStatus('sending bitmap');
+                        await window.bontasticBitmap.sendBitmap(characteristic, encoded);
+                        this.setStatus('printed');
+                    } finally {
+                        this.bitmapBusy = false;
+                    }
                 },
                 async sendPrint() {
                     if (!this.connected || !this.printText) {

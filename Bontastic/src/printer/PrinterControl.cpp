@@ -6,6 +6,7 @@
 #include <string>
 #include "PrintHelpers.h"
 #include "Bontastic_Thermal.h"
+#include "MeshtasticBLELogger.h"
 
 extern const char *localDeviceName;
 extern Bontastic_Thermal printer;
@@ -60,15 +61,96 @@ enum SettingField : uint8_t
 static const uint16_t printerAppearance = 0x03C0;
 
 static const char *meshLinkUuid = "5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002";
+static const char *bitmapUuid = "5a1a0016-8f19-4a86-9a9e-7b4f7f9b0002";
+static const char *logUuid = "5a1a0017-8f19-4a86-9a9e-7b4f7f9b0002";
 
 static NimBLEServer *printerServer;
 static NimBLECharacteristic *characteristics[FieldCount];
 static NimBLECharacteristic *meshLinkCharacteristic;
+static NimBLECharacteristic *bitmapCharacteristic;
+static NimBLECharacteristic *logCharacteristic;
 static bool lastMeshLink;
 static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, 2, 23, "MO1_1dfd", "123456", 1, 2};
 static PrinterSettings printerSettings = defaultSettings;
 static Preferences printerPrefs;
 static bool prefsReady;
+
+static uint16_t bitmapHeight;
+static uint32_t bitmapExpected;
+static uint32_t bitmapReceived;
+static std::string bitmapBuffer;
+static const uint16_t bitmapWidth = 384;
+static uint8_t bitmapHeader[8];
+static uint8_t bitmapHeaderReceived;
+static uint32_t bitmapLastLog;
+
+static void handleBitmapChunk(const uint8_t *data, size_t len)
+{
+    if (!data || len == 0)
+    {
+        return;
+    }
+
+    if (bitmapExpected == 0)
+    {
+        while (bitmapHeaderReceived < sizeof(bitmapHeader) && len > 0)
+        {
+            bitmapHeader[bitmapHeaderReceived++] = *data++;
+            len--;
+        }
+        if (bitmapHeaderReceived < sizeof(bitmapHeader))
+        {
+            return;
+        }
+        if (bitmapHeader[0] != 0x42 || bitmapHeader[1] != 0x4d)
+        {
+            bitmapHeaderReceived = 0;
+            return;
+        }
+        bitmapHeight = (uint16_t)bitmapHeader[2] | ((uint16_t)bitmapHeader[3] << 8);
+        bitmapExpected = (uint32_t)bitmapHeader[4] | ((uint32_t)bitmapHeader[5] << 8) | ((uint32_t)bitmapHeader[6] << 16) | ((uint32_t)bitmapHeader[7] << 24);
+        bitmapReceived = 0;
+        bitmapLastLog = 0;
+        bitmapBuffer.clear();
+        bitmapBuffer.reserve(bitmapExpected);
+        bleLogf("BMP start h=%u bytes=%lu", (unsigned)bitmapHeight, (unsigned long)bitmapExpected);
+    }
+
+    if (bitmapExpected == 0)
+    {
+        return;
+    }
+
+    size_t take = len;
+    if (bitmapReceived + take > bitmapExpected)
+    {
+        take = bitmapExpected - bitmapReceived;
+    }
+    if (take > 0)
+    {
+        bitmapBuffer.append(reinterpret_cast<const char *>(data), take);
+        bitmapReceived += take;
+    }
+
+    if (bitmapReceived - bitmapLastLog >= 2048)
+    {
+        bitmapLastLog = bitmapReceived;
+        bleLogf("BMP %lu/%lu", (unsigned long)bitmapReceived, (unsigned long)bitmapExpected);
+    }
+
+    if (bitmapReceived == bitmapExpected)
+    {
+        bleLog("BMP print");
+        printer.gsV0(0, bitmapWidth / 8, bitmapHeight,
+                     reinterpret_cast<const uint8_t *>(bitmapBuffer.data()), bitmapBuffer.size());
+        printer.feed(2);
+        bleLog("BMP done");
+        bitmapExpected = 0;
+        bitmapReceived = 0;
+        bitmapHeaderReceived = 0;
+        bitmapBuffer.clear();
+    }
+}
 
 static void syncMeshLink(bool notify)
 {
@@ -534,6 +616,21 @@ class PrinterServerCallbacks : public NimBLEServerCallbacks
 
 static PrinterServerCallbacks serverCallbacks;
 
+class BitmapCallbacks : public NimBLECharacteristicCallbacks
+{
+    void onWrite(NimBLECharacteristic *c, NimBLEConnInfo &) override
+    {
+        const std::string &v = c->getValue();
+        if (v.empty())
+        {
+            return;
+        }
+        handleBitmapChunk(reinterpret_cast<const uint8_t *>(v.data()), v.size());
+    }
+};
+
+static BitmapCallbacks bitmapCallbacks;
+
 void setupPrinterControl()
 {
     if (printerServer)
@@ -561,6 +658,13 @@ void setupPrinterControl()
     meshLinkCharacteristic = service->createCharacteristic(meshLinkUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
     lastMeshLink = meshtasticConnected;
     syncMeshLink(false);
+
+    bitmapCharacteristic = service->createCharacteristic(bitmapUuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+    bitmapCharacteristic->setCallbacks(&bitmapCallbacks);
+
+    logCharacteristic = service->createCharacteristic(logUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    bleLogAttachCharacteristic(logCharacteristic);
+
     service->start();
     loadSettings();
     applyPrinterConfig();

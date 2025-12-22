@@ -8,6 +8,7 @@
 
 #include "src/printer/PrintHelpers.h"
 #include "src/printer/PrinterControl.h"
+#include "src/printer/MeshtasticBLELogger.h"
 
 #define ENABLE_CONTEST_QR_MODULE
 #ifdef ENABLE_CONTEST_QR_MODULE
@@ -56,24 +57,20 @@ void decodeFromRadioPacket(const std::string &packet)
   pb_istream_t stream = pb_istream_from_buffer(reinterpret_cast<const uint8_t *>(packet.data()), packet.size());
   if (!pb_decode(&stream, meshtastic_FromRadio_fields, &msg))
   {
-    Serial.println("FromRadio decode failed");
+    bleLog("FromRadio decode failed");
     return;
   }
 
   if (msg.which_payload_variant == meshtastic_FromRadio_packet_tag)
   {
     const meshtastic_Data &d = msg.packet.decoded;
-    Serial.print("Port ");
-    Serial.print(d.portnum);
-    Serial.print(" Len ");
-    Serial.println(d.payload.size);
+    bleLogf("FromRadio port=%u len=%u", (unsigned)d.portnum, (unsigned)d.payload.size);
 
     switch (d.portnum)
     {
     case meshtastic_PortNum_TEXT_MESSAGE_APP:
       if (d.payload.size > 0)
       {
-        Serial.print("TEXT: ");
         std::string senderName = "Unknown";
         if (nodeNames.count(msg.packet.from))
         {
@@ -99,7 +96,7 @@ void decodeFromRadioPacket(const std::string &packet)
       }
       else
       {
-        Serial.println("POS decode fail");
+        bleLog("POS decode fail");
       }
       break;
     }
@@ -115,13 +112,12 @@ void decodeFromRadioPacket(const std::string &packet)
       }
       else
       {
-        Serial.println("NODE decode fail");
+        bleLog("NODE decode fail");
       }
       break;
     }
 
     default:
-      Serial.print("BIN ");
       printBinaryPayload(d.payload.bytes, d.payload.size);
       break;
     }
@@ -135,11 +131,9 @@ void drainFromRadio()
     std::string packet;
     if (!readFromRadioPacket(packet))
     {
-      Serial.println("FromRadio empty");
       break;
     }
-    Serial.print("FromRadio bytes ");
-    Serial.println(packet.size());
+    bleLogf("FromRadio bytes=%u", (unsigned)packet.size());
     decodeFromRadioPacket(packet);
   }
 }
@@ -149,42 +143,36 @@ class ClientCallbacks : public NimBLEClientCallbacks
   void onConnect(NimBLEClient *) override
   {
     meshtasticConnected = true;
-    Serial.println("Connected");
+    bleLog("Meshtastic connected");
   }
 
   void onDisconnect(NimBLEClient *, int) override
   {
     meshtasticConnected = false;
-    Serial.println("Disconnected");
+    bleLog("Meshtastic disconnected");
   }
 
   void onPassKeyEntry(NimBLEConnInfo &info) override
   {
-    Serial.println("Passkey requested");
+    bleLog("Passkey requested");
     uint32_t passkey = atoi(getPrinterSettings().meshPin);
     NimBLEDevice::injectPassKey(info, passkey);
   }
 
   void onAuthenticationComplete(NimBLEConnInfo &) override
   {
-    Serial.println("Bonded");
+    bleLog("Bonded");
   }
 } clientCallbacks;
 
 void setup()
 {
-  Serial.begin(115200);
-
-  // while (!Serial)
-  //{
-  //}
-  Serial.println("Lets Go");
-
   wantConfigId = millis() & 0xFFFF;
 
   NimBLEDevice::init(localDeviceName);
   setupPrinterControl();
   printerSetup();
+  bleLog("Boot");
 
 #ifdef ENABLE_CONTEST_QR_MODULE
   contestQrSetup();
@@ -193,7 +181,7 @@ void setup()
 #endif
 
   NimBLEDevice::deleteAllBonds();
-  Serial.println("Cleared bonds");
+  bleLog("Cleared bonds");
   NimBLEDevice::setMTU(512);
   NimBLEDevice::setSecurityAuth(false, false, false);
   NimBLEDevice::setSecurityIOCap(BLE_HS_IO_KEYBOARD_ONLY);
@@ -202,7 +190,7 @@ void setup()
   NimBLEScan *scan = NimBLEDevice::getScan();
   scan->setActiveScan(true);
   NimBLEScanResults results = scan->getResults(5 * 1000, false);
-  Serial.println("Scan completed");
+  bleLog("Scan completed");
 
   const NimBLEAdvertisedDevice *targetDevice = nullptr;
   const char *targetName = getPrinterSettings().meshName;
@@ -213,32 +201,29 @@ void setup()
     if (name == targetName)
     {
       targetDevice = device;
-      Serial.print("Target ");
-      Serial.print(device->getAddress().toString().c_str());
-      Serial.print(" ");
-      Serial.println(name.c_str());
+      bleLogf("Target %s %s", device->getAddress().toString().c_str(), name.c_str());
       break;
     }
   }
 
   if (!targetDevice)
   {
-    Serial.println("Target not found");
+    bleLog("Target not found");
     return;
   }
 
   NimBLEClient *client = NimBLEDevice::createClient();
   if (!client)
   {
-    Serial.println("Client create failed");
+    bleLog("Client create failed");
     return;
   }
 
   client->setClientCallbacks(&clientCallbacks, false);
-  Serial.println("Connecting");
+  bleLog("Connecting");
   if (!client->connect(targetDevice))
   {
-    Serial.println("Connect failed");
+    bleLog("Connect failed");
     NimBLEDevice::deleteClient(client);
     return;
   }
@@ -246,7 +231,7 @@ void setup()
   NimBLERemoteService *deviceInfo = client->getService(deviceInfoServiceUuid);
   if (deviceInfo)
   {
-    Serial.println("DeviceInformationService");
+    bleLog("DeviceInformationService");
 
     auto printChar = [&](const char *name, const char *uuid)
     {
@@ -267,21 +252,20 @@ void setup()
     printChar("SW", softwareRevUuid);
   }
 
-  Serial.println("Securing");
+  bleLog("Securing");
   if (!client->secureConnection())
   {
-    Serial.println("Secure start failed");
+    bleLog("Secure start failed");
   }
 
   NimBLERemoteService *service = client->getService(targetService);
   if (!service)
   {
-    Serial.println("Service not found");
+    bleLog("Service not found");
     return;
   }
 
-  Serial.print("Service ");
-  Serial.println(targetService);
+  bleLogf("Service %s", targetService);
 
   fromRadio = service->getCharacteristic(uuidFromRadio);
   toRadio = service->getCharacteristic(uuidToRadio);
@@ -295,18 +279,18 @@ void setup()
   pb_ostream_t ostream = pb_ostream_from_buffer(buffer, sizeof(buffer));
   if (!pb_encode(&ostream, meshtastic_ToRadio_fields, &req))
   {
-    Serial.println("Start config encode failed");
+    bleLog("Start config encode failed");
     return;
   }
 
-  Serial.println("Request config");
+  bleLog("Request config");
   if (!toRadio->writeValue(buffer, ostream.bytes_written, true))
   {
-    Serial.println("Start config failed");
+    bleLog("Start config failed");
     return;
   }
 
-  Serial.println("Reading FromRadio");
+  bleLog("Reading FromRadio");
   drainFromRadio();
 
   auto notifyCallback = [](NimBLERemoteCharacteristic *characteristic, uint8_t *, size_t, bool isNotify)
@@ -319,18 +303,17 @@ void setup()
     {
       notifyQueueCount++;
       fromRadioPending = true;
-      Serial.print("FromNum notify queued: ");
-      Serial.println(notifyQueueCount);
+      bleLogf("FromNum notify queued: %d", notifyQueueCount);
     }
     else
     {
-      Serial.println("FromNum notify dropped (queue full)");
+      bleLog("FromNum notify dropped (queue full)");
     }
   };
 
   if (!fromNum->subscribe(true, notifyCallback, true))
   {
-    Serial.println("FromNum subscribe failed");
+    bleLog("FromNum subscribe failed");
   }
 }
 
@@ -347,9 +330,7 @@ void loop()
     fromRadioPending = false;
     int count = notifyQueueCount;
     notifyQueueCount = 0;
-    Serial.print("Draining FromRadio for ");
-    Serial.print(count);
-    Serial.println(" notify events");
+    bleLogf("Draining FromRadio for %d notify events", count);
     drainFromRadio();
   }
 }

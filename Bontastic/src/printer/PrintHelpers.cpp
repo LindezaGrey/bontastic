@@ -2,6 +2,7 @@
 #include "Bontastic_Thermal.h"
 #include "PrinterControl.h"
 #include "assets/bontastic.h"
+#include "MeshtasticBLELogger.h"
 #include <time.h>
 
 Bontastic_Thermal printer(&Serial2);
@@ -19,8 +20,8 @@ void printerSetup()
     const PrinterSettings &settings = getPrinterSettings();
     updatePrinterPins(settings.printerRxPin, settings.printerTxPin);
 
-    Serial.println("Startup bitmap print");
-    printer.gsV0(0, bontastic_width / 8, bontastic_height, bontastic_data, sizeof(bontastic_data));
+    bleLog("Startup bitmap print");
+    // printer.gsV0(0, bontastic_width / 8, bontastic_height, bontastic_data, sizeof(bontastic_data));
     printer.feed(2);
 }
 
@@ -69,8 +70,7 @@ std::string utf8ToIso88591(const std::string &utf8)
 
 void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint32_t timestamp)
 {
-    Serial.write(data, size);
-    Serial.println();
+    bleLogf("TEXT %u bytes", (unsigned)size);
 
     // Format time
     time_t t = (time_t)timestamp;
@@ -102,12 +102,7 @@ void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint
 
 void printPosition(double lat, double lon, int32_t alt)
 {
-    Serial.print("POS lat=");
-    Serial.print(lat, 7);
-    Serial.print(" lon=");
-    Serial.print(lon, 7);
-    Serial.print(" alt=");
-    Serial.println(alt);
+    bleLogf("POS lat=%.7f lon=%.7f alt=%ld", lat, lon, (long)alt);
 
     // printer.print("POS lat=");
     // printer.print(lat, 7);
@@ -119,10 +114,7 @@ void printPosition(double lat, double lon, int32_t alt)
 
 void printNodeInfo(uint32_t num, const char *name)
 {
-    Serial.print("NODE ");
-    Serial.print(num);
-    Serial.print(" ");
-    Serial.println(name);
+    bleLogf("NODE %lu %s", (unsigned long)num, name ? name : "");
 
     printer.print("NODE ");
     printer.print(num);
@@ -132,23 +124,12 @@ void printNodeInfo(uint32_t num, const char *name)
 
 void printBinaryPayload(const uint8_t *data, size_t size)
 {
-    for (size_t i = 0; i < size; ++i)
-    {
-        uint8_t b = data[i];
-        if (b < 16)
-        {
-            Serial.print("0");
-        }
-        Serial.print(b, HEX);
-    }
-    Serial.println();
+    bleLogf("BIN %u bytes", (unsigned)size);
 }
 
 void printInfo(const char *label, const char *value)
 {
-    Serial.print(label);
-    Serial.print(": ");
-    Serial.println(value);
+    bleLogf("%s: %s", label ? label : "", value ? value : "");
 
     printer.print(label);
     printer.print(": ");
