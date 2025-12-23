@@ -58,7 +58,10 @@ void printerSetup()
 {
     const PrinterSettings &settings = getPrinterSettings();
     updatePrinterPins(settings.printerRxPin, settings.printerTxPin);
+}
 
+void printStartupLogo()
+{
     bleLog("Startup bitmap print");
     // printer.gsV0(0, bontastic_width / 8, bontastic_height, bontastic_data, sizeof(bontastic_data));
     bool upsideDown = (getPrinterSettings().decorations & 0x10) != 0;

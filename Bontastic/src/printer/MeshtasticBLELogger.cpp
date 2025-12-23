@@ -6,15 +6,21 @@
 #include <stdio.h>
 
 static NimBLECharacteristic *logCharacteristic;
+static volatile bool logEnabled;
 
 void bleLogAttachCharacteristic(NimBLECharacteristic *c)
 {
     logCharacteristic = c;
 }
 
+void bleLogSetEnabled(bool enabled)
+{
+    logEnabled = enabled;
+}
+
 void bleLog(const char *msg)
 {
-    if (!logCharacteristic || !msg)
+    if (!logEnabled || !logCharacteristic || !msg)
     {
         return;
     }
@@ -25,7 +31,7 @@ void bleLog(const char *msg)
 
 void bleLogf(const char *fmt, ...)
 {
-    if (!logCharacteristic || !fmt)
+    if (!logEnabled || !logCharacteristic || !fmt)
     {
         return;
     }

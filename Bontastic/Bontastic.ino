@@ -176,7 +176,7 @@ void setup()
 
 #ifdef ENABLE_CONTEST_QR_MODULE
   contestQrSetup();
-  contestQrSetIntervalMinutes(5);
+  contestQrSetIntervalMinutes(15);
   contestQrSetContent("tALaJ2r35ygij1KCB3PvxSCl609Tajv4XYhMEscw7JY=");
 #endif
 
@@ -292,6 +292,8 @@ void setup()
 
   bleLog("Reading FromRadio");
   drainFromRadio();
+
+  printStartupLogo();
 
   auto notifyCallback = [](NimBLERemoteCharacteristic *characteristic, uint8_t *, size_t, bool isNotify)
   {

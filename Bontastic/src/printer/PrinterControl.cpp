@@ -648,10 +648,14 @@ private:
 
 class PrinterServerCallbacks : public NimBLEServerCallbacks
 {
-    void onConnect(NimBLEServer *, NimBLEConnInfo &) override {}
+    void onConnect(NimBLEServer *, NimBLEConnInfo &) override
+    {
+        bleLogSetEnabled(true);
+    }
 
     void onDisconnect(NimBLEServer *, NimBLEConnInfo &, int) override
     {
+        bleLogSetEnabled(false);
         NimBLEDevice::startAdvertising();
     }
 };
