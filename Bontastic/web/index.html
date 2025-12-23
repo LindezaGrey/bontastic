@@ -767,7 +767,7 @@
                 pushLog(text) {
                     const stamp = new Date().toLocaleTimeString();
                     this.log.unshift({ id: this.nextLogId++, timestamp: stamp, text });
-                    if (this.log.length > 50) {
+                    if (this.log.length > 500) {
                         this.log.pop();
                     }
                 },
