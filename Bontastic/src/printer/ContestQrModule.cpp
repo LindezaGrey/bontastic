@@ -5,6 +5,8 @@
 
 #include "Bontastic_Thermal.h"
 #include "PrinterControl.h"
+#include "PrintHelpers.h"
+#include "src/printer/assets/congresslogo.h"
 
 extern Bontastic_Thermal printer;
 
@@ -39,7 +41,9 @@ void contestQrLoop()
     {
         return;
     }
-
+    bool upsideDown = (getPrinterSettings().decorations & 0x10) != 0;
+    gsV0WithUpsideDown(congresslogo_width / 8, congresslogo_height, congresslogo_data, sizeof(congresslogo_data), upsideDown);
+    printer.feed(2);
     printer.justify('C');
     printer.qrSelectModel(2);
     printer.qrSetModuleSize(4);

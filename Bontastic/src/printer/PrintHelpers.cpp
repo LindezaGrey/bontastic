@@ -5,6 +5,8 @@
 #include "src/printer/assets/congresslogo.h"
 #include "MeshtasticBLELogger.h"
 #include <time.h>
+#include <vector>
+#include <sstream>
 
 Bontastic_Thermal printer(&Serial2);
 
@@ -16,7 +18,7 @@ static uint8_t reverseBits(uint8_t b)
     return b;
 }
 
-static void gsV0WithUpsideDown(uint16_t widthBytes, uint16_t height, const uint8_t *data, size_t len, bool upsideDown)
+void gsV0WithUpsideDown(uint16_t widthBytes, uint16_t height, const uint8_t *data, size_t len, bool upsideDown)
 {
     if (!data || !len)
     {
@@ -112,6 +114,78 @@ std::string utf8ToIso88591(const std::string &utf8)
     return iso;
 }
 
+static int getCharsPerLine() {
+    const PrinterSettings& settings = getPrinterSettings();
+    // Standard 58mm Thermal Printer (384 dots width)
+    // Font A: 12x24 dots -> 384 / 12 = 32 characters
+    // Font B: 9x17 dots  -> 384 / 9  = 42.66 -> 42 characters
+    int baseChars = (settings.font != 0) ? 42 : 32;
+    
+    // Check for double width (Size 'L' or doubleWidth decoration)
+    // Size: 0=S, 1=M, 2=L (L includes double width)
+    // Decorations: 0x08 is double width
+    bool isDoubleWidth = (settings.size == 2) || (settings.decorations & 0x08);
+    
+    if (isDoubleWidth) {
+        return baseChars / 2;
+    }
+    return baseChars;
+}
+
+static std::vector<std::string> wrapText(const std::string& text, size_t maxWidth) {
+    std::vector<std::string> lines;
+    size_t start = 0;
+    size_t len = text.length();
+    
+    while (start < len) {
+        size_t end = text.find('\n', start);
+        if (end == std::string::npos) end = len;
+        
+        std::string line = text.substr(start, end - start);
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        
+        if (line.empty()) {
+             lines.push_back("");
+             start = end + 1;
+             continue;
+        }
+
+        size_t lineStart = 0;
+        while (lineStart < line.length()) {
+            if (line.length() - lineStart <= maxWidth) {
+                lines.push_back(line.substr(lineStart));
+                break;
+            }
+            
+            size_t breakPoint = line.rfind(' ', lineStart + maxWidth);
+            if (breakPoint == std::string::npos || breakPoint < lineStart) {
+                breakPoint = lineStart + maxWidth;
+            }
+            
+            lines.push_back(line.substr(lineStart, breakPoint - lineStart));
+            lineStart = breakPoint;
+            if (lineStart < line.length() && line[lineStart] == ' ') {
+                lineStart++;
+            }
+        }
+        
+        start = end + 1;
+    }
+    return lines;
+}
+
+void printStyledText(const std::string &text) {
+    bool upsideDown = (getPrinterSettings().decorations & 0x10) != 0;
+    if (upsideDown) {
+        std::vector<std::string> lines = wrapText(text, getCharsPerLine());
+        for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
+            printer.println(it->c_str());
+        }
+    } else {
+        printer.println(text.c_str());
+    }
+}
+
 void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint32_t timestamp)
 {
     bleLogf("TEXT %u bytes", (unsigned)size);
@@ -140,7 +214,8 @@ void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint
 
     std::string utf8((const char *)data, size);
     std::string iso = utf8ToIso88591(utf8);
-    printer.println(iso.c_str());
+
+    printStyledText(iso);
     printer.feed(2);
 }
 

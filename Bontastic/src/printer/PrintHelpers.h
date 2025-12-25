@@ -12,3 +12,5 @@ void printerSetup();
 void printStartupLogo();
 void updatePrinterPins(int rx, int tx);
 std::string utf8ToIso88591(const std::string &utf8);
+void printStyledText(const std::string &text);
+void gsV0WithUpsideDown(uint16_t widthBytes, uint16_t height, const uint8_t *data, size_t len, bool upsideDown);
