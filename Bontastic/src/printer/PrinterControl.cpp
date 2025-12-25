@@ -84,7 +84,6 @@ static uint8_t bitmapHeader[8];
 static uint8_t bitmapHeaderReceived;
 static uint32_t bitmapLastLog;
 
-
 static void handleBitmapChunk(const uint8_t *data, size_t len)
 {
     if (!data || len == 0)
