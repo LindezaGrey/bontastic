@@ -89,33 +89,45 @@ std::string processTextForPrinter(const std::string &utf8)
 
         uint32_t cp = 0;
         size_t next_i = i;
-        
+
         if ((c & 0xE0) == 0xC0) // 2-byte
         {
             if (i + 1 < utf8.size())
             {
-                cp = ((c & 0x1F) << 6) | (utf8[i+1] & 0x3F);
+                cp = ((c & 0x1F) << 6) | (utf8[i + 1] & 0x3F);
                 next_i += 2;
             }
-            else { i++; continue; }
+            else
+            {
+                i++;
+                continue;
+            }
         }
         else if ((c & 0xF0) == 0xE0) // 3-byte
         {
             if (i + 2 < utf8.size())
             {
-                cp = ((c & 0x0F) << 12) | ((utf8[i+1] & 0x3F) << 6) | (utf8[i+2] & 0x3F);
+                cp = ((c & 0x0F) << 12) | ((utf8[i + 1] & 0x3F) << 6) | (utf8[i + 2] & 0x3F);
                 next_i += 3;
             }
-            else { i++; continue; }
+            else
+            {
+                i++;
+                continue;
+            }
         }
         else if ((c & 0xF8) == 0xF0) // 4-byte
         {
             if (i + 3 < utf8.size())
             {
-                cp = ((c & 0x07) << 18) | ((utf8[i+1] & 0x3F) << 12) | ((utf8[i+2] & 0x3F) << 6) | (utf8[i+3] & 0x3F);
+                cp = ((c & 0x07) << 18) | ((utf8[i + 1] & 0x3F) << 12) | ((utf8[i + 2] & 0x3F) << 6) | (utf8[i + 3] & 0x3F);
                 next_i += 4;
             }
-            else { i++; continue; }
+            else
+            {
+                i++;
+                continue;
+            }
         }
         else
         {
@@ -130,10 +142,10 @@ std::string processTextForPrinter(const std::string &utf8)
             i = next_i;
             continue;
         }
-        
+
         // Check emoji map
         bool found = false;
-        for (const auto& entry : emojiTable)
+        for (const auto &entry : emojiTable)
         {
             if (entry.codepoint == cp)
             {

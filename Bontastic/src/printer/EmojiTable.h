@@ -1,9 +1,10 @@
 #pragma once
 #include <stdint.h>
 
-struct EmojiMap {
+struct EmojiMap
+{
     uint32_t codepoint;
-    const char* shortcode;
+    const char *shortcode;
 };
 
 static const EmojiMap emojiTable[] = {
