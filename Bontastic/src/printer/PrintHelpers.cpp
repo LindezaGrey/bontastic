@@ -4,6 +4,7 @@
 #include "assets/bontastic.h"
 #include "src/printer/assets/congresslogo.h"
 #include "MeshtasticBLELogger.h"
+#include "EmojiTable.h"
 #include <time.h>
 #include <vector>
 #include <sstream>
@@ -71,47 +72,92 @@ void printStartupLogo()
     printer.feed(2);
 }
 
-std::string utf8ToIso88591(const std::string &utf8)
+std::string processTextForPrinter(const std::string &utf8)
 {
-    std::string iso;
-    iso.reserve(utf8.size());
-    for (size_t i = 0; i < utf8.size(); ++i)
+    std::string result;
+    result.reserve(utf8.size());
+    size_t i = 0;
+    while (i < utf8.size())
     {
         uint8_t c = utf8[i];
         if (c < 0x80)
         {
-            iso += (char)c;
+            result += (char)c;
+            i++;
+            continue;
         }
-        else if ((c & 0xE0) == 0xC0) // 2-byte sequence
+
+        uint32_t cp = 0;
+        size_t next_i = i;
+        
+        if ((c & 0xE0) == 0xC0) // 2-byte
         {
             if (i + 1 < utf8.size())
             {
-                uint8_t c2 = utf8[i + 1];
-                if ((c2 & 0xC0) == 0x80)
-                {
-                    uint16_t cp = ((c & 0x1F) << 6) | (c2 & 0x3F);
-                    if (cp <= 0xFF)
-                    {
-                        iso += (char)cp;
-                    }
-                    else
-                    {
-                        iso += '?'; // Character not in ISO-8859-1
-                    }
-                    i++; // Skip next byte
-                }
+                cp = ((c & 0x1F) << 6) | (utf8[i+1] & 0x3F);
+                next_i += 2;
             }
+            else { i++; continue; }
+        }
+        else if ((c & 0xF0) == 0xE0) // 3-byte
+        {
+            if (i + 2 < utf8.size())
+            {
+                cp = ((c & 0x0F) << 12) | ((utf8[i+1] & 0x3F) << 6) | (utf8[i+2] & 0x3F);
+                next_i += 3;
+            }
+            else { i++; continue; }
+        }
+        else if ((c & 0xF8) == 0xF0) // 4-byte
+        {
+            if (i + 3 < utf8.size())
+            {
+                cp = ((c & 0x07) << 18) | ((utf8[i+1] & 0x3F) << 12) | ((utf8[i+2] & 0x3F) << 6) | (utf8[i+3] & 0x3F);
+                next_i += 4;
+            }
+            else { i++; continue; }
         }
         else
         {
-            // 3+ byte sequences or invalid UTF-8, skip or replace
-            // For now, just ignore or maybe add '?'
-            // If we just skip, we might miss characters.
-            // But ISO-8859-1 only supports up to U+00FF.
-            // So 3-byte sequences (U+0800+) are definitely out.
+            i++;
+            continue;
         }
+
+        // Check if it's a printable ISO-8859-1 char (U+0080 to U+00FF)
+        if (cp >= 0x80 && cp <= 0xFF)
+        {
+            result += (char)cp;
+            i = next_i;
+            continue;
+        }
+        
+        // Check emoji map
+        bool found = false;
+        for (const auto& entry : emojiTable)
+        {
+            if (entry.codepoint == cp)
+            {
+                result += entry.shortcode;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            // If it's a high codepoint (likely emoji or symbol), maybe print [?]
+            if (cp > 0xFF)
+            {
+                result += "[?]";
+            }
+            else
+            {
+                result += '?';
+            }
+        }
+        i = next_i;
     }
-    return iso;
+    return result;
 }
 
 static int getCharsPerLine()
@@ -229,9 +275,9 @@ void printTextMessage(const uint8_t *data, size_t size, const char *sender, uint
     printer.println(timeBuf);
 
     std::string utf8((const char *)data, size);
-    std::string iso = utf8ToIso88591(utf8);
+    std::string processed = processTextForPrinter(utf8);
 
-    printStyledText(iso);
+    printStyledText(processed);
     printer.feed(2);
 }
 

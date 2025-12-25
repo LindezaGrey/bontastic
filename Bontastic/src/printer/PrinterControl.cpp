@@ -530,8 +530,8 @@ static void handleWrite(uint8_t field, const std::string &payload)
     }
     if (field == PrintText)
     {
-        std::string iso = utf8ToIso88591(payload);
-        printStyledText(iso);
+        std::string processed = processTextForPrinter(payload);
+        printStyledText(processed);
         printer.feed(2);
         return;
     }
