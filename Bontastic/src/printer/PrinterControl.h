@@ -21,7 +21,10 @@ struct PrinterSettings
     char meshPin[16];
     uint8_t printerRxPin;
     uint8_t printerTxPin;
+    uint8_t printerErrorPin;
 };
+
+void sendMeshtasticNotification(const char *message);
 
 void setupPrinterControl();
 void printerControlLoop();

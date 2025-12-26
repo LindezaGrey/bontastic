@@ -232,7 +232,7 @@
                 <header class="flex justify-between items-center text-green-300">
                     <h2 class="text-lg font-mono tracking-wide">PRINTER CONNECTION</h2>
                 </header>
-                <div class="grid gap-4 md:grid-cols-2">
+                <div class="grid gap-4 md:grid-cols-3">
                     <div class="space-y-2">
                         <label class="text-xs text-green-400/70 uppercase">Printer RX</label>
                         <input type="number" v-model.number="settings.printerRxPin"
@@ -243,6 +243,12 @@
                         <label class="text-xs text-green-400/70 uppercase">Printer TX</label>
                         <input type="number" v-model.number="settings.printerTxPin"
                             @change="updateSetting('printerTxPin')" :disabled="!connected"
+                            class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100 text-sm focus:outline-none focus:border-green-400">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-green-400/70 uppercase">DTR Pin</label>
+                        <input type="number" v-model.number="settings.printerErrorPin"
+                            @change="updateSetting('printerErrorPin')" :disabled="!connected"
                             class="w-full bg-black/60 border border-green-500/40 rounded px-3 py-2 text-green-100 text-sm focus:outline-none focus:border-green-400">
                     </div>
                 </div>
@@ -612,6 +618,7 @@
             printerRxPin: '5a1a0012-8f19-4a86-9a9e-7b4f7f9b0002',
             printerTxPin: '5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002',
             printQr: '5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002',
+            printerErrorPin: '5a1a0019-8f19-4a86-9a9e-7b4f7f9b0002',
             meshConnected: '5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002',
             bitmap: '5a1a0016-8f19-4a86-9a9e-7b4f7f9b0002',
             log: '5a1a0017-8f19-4a86-9a9e-7b4f7f9b0002',
@@ -653,7 +660,8 @@
                         meshName: '',
                         meshPin: '',
                         printerRxPin: 1,
-                        printerTxPin: 2
+                        printerTxPin: 2,
+                        printerErrorPin: 22
                     },
                     printText: '',
                     bitmapFile: null,

@@ -32,7 +32,8 @@ static const char *fieldUuids[] = {
     "5a1a0011-8f19-4a86-9a9e-7b4f7f9b0002",
     "5a1a0012-8f19-4a86-9a9e-7b4f7f9b0002",
     "5a1a0013-8f19-4a86-9a9e-7b4f7f9b0002",
-    "5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002"};
+    "5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002",
+    "5a1a0019-8f19-4a86-9a9e-7b4f7f9b0002"};
 
 enum SettingField : uint8_t
 {
@@ -55,6 +56,7 @@ enum SettingField : uint8_t
     PrinterRxPin,
     PrinterTxPin,
     PrintQr,
+    PrinterErrorPin,
     FieldCount
 };
 
@@ -73,7 +75,7 @@ static NimBLECharacteristic *logCharacteristic;
 static NimBLECharacteristic *printerStatusCharacteristic;
 static bool lastMeshLink;
 static bool lastPrinterErrorState = false;
-static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, 2, 23, "MO1_1dfd", "123456", 1, 2};
+static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, 2, 23, "MO1_1dfd", "123456", 1, 2, 22};
 static PrinterSettings printerSettings = defaultSettings;
 static Preferences printerPrefs;
 static bool prefsReady;
@@ -214,6 +216,8 @@ static const char *fieldLabel(uint8_t field)
         return "PRINTER_TX";
     case PrintQr:
         return "PRINT_QR";
+    case PrinterErrorPin:
+        return "PRINTER_ERR";
     default:
         return nullptr;
     }
@@ -238,7 +242,8 @@ static const char *fieldKeys[] = {
     "meshPin",
     "printerRxPin",
     "printerTxPin",
-    nullptr};
+    nullptr,
+    "printerErrPin"};
 
 static void *fieldSlot(uint8_t field);
 
@@ -347,6 +352,8 @@ static void *fieldSlot(uint8_t field)
         return &printerSettings.printerRxPin;
     case PrinterTxPin:
         return &printerSettings.printerTxPin;
+    case PrinterErrorPin:
+        return &printerSettings.printerErrorPin;
     case PrintText:
     case PrintQr:
         return nullptr;
@@ -387,6 +394,7 @@ static uint16_t clampField(uint8_t field, int value)
         return constrain(value, 0, 47);
     case PrinterRxPin:
     case PrinterTxPin:
+    case PrinterErrorPin:
         return constrain(value, 0, 40);
     case PrintText:
     case PrintQr:
@@ -584,6 +592,10 @@ static void handleWrite(uint8_t field, const std::string &payload)
     {
         updatePrinterPins(printerSettings.printerRxPin, printerSettings.printerTxPin);
     }
+    else if (field == PrinterErrorPin)
+    {
+        pinMode(printerSettings.printerErrorPin, INPUT);
+    }
     else
     {
         applyPrinterConfig();
@@ -678,10 +690,10 @@ void setupPrinterControl()
 
     printerStatusCharacteristic = service->createCharacteristic(printerStatusUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
     printerStatusCharacteristic->setValue(lastPrinterErrorState ? "1" : "0");
-    pinMode(22, INPUT);
 
     service->start();
     loadSettings();
+    pinMode(printerSettings.printerErrorPin, INPUT);
     applyPrinterConfig();
     for (uint8_t i = 0; i < FieldCount; ++i)
     {
@@ -711,7 +723,7 @@ void printerControlLoop()
         syncMeshLink(true);
     }
 
-    bool currentErrorState = (digitalRead(22) == HIGH);
+    bool currentErrorState = (digitalRead(printerSettings.printerErrorPin) == HIGH);
     if (currentErrorState != lastPrinterErrorState)
     {
         lastPrinterErrorState = currentErrorState;
@@ -720,6 +732,7 @@ void printerControlLoop()
         if (currentErrorState)
         {
             bleLog("Printer Error: No Paper");
+            sendMeshtasticNotification("Alert no paper!");
         }
         else
         {

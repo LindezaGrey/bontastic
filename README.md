@@ -24,6 +24,13 @@ Bontastic is a small ESP32-based “mesh-to-thermal” gateway:
 - Receives messages
 - Prints them on a thermal printer for an always-on physical log
 
+## Features
+
+- **Meshtastic Integration**: Connects to a Meshtastic node via BLE to receive and print messages.
+- **Thermal Printing**: Prints received text messages.
+- **Web Configuration**: Configure printer settings (heat, density, font, etc.) via a Web Bluetooth interface.
+- **Error Reporting**: Monitors the printer's paper status. If the printer runs out of paper, it broadcasts an "Alert no paper!" notification to the Meshtastic mesh (specifically on the "bontastic" channel if available).
+
 ## What’s in this repo
 
 - **Firmware** (Arduino/ESP32): main sketch and printer/BLE code

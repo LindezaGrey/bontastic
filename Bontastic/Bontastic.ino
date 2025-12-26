@@ -19,6 +19,7 @@
 #include <string>
 
 std::map<uint32_t, std::string> nodeNames;
+std::map<std::string, int> channelIndices;
 
 const char *localDeviceName = "Bontastic Printer";
 
@@ -120,6 +121,15 @@ void decodeFromRadioPacket(const std::string &packet)
     default:
       printBinaryPayload(d.payload.bytes, d.payload.size);
       break;
+    }
+  }
+  else if (msg.which_payload_variant == meshtastic_FromRadio_channel_tag)
+  {
+    const meshtastic_Channel &c = msg.channel;
+    if (c.settings.name[0] != 0)
+    {
+      channelIndices[c.settings.name] = c.index;
+      bleLogf("Channel %s index %d", c.settings.name, c.index);
     }
   }
 }
@@ -316,6 +326,61 @@ void setup()
   if (!fromNum->subscribe(true, notifyCallback, true))
   {
     bleLog("FromNum subscribe failed");
+  }
+}
+
+void sendMeshtasticNotification(const char *message)
+{
+  if (!toRadio)
+  {
+    bleLog("Cannot send notification: toRadio not set");
+    return;
+  }
+
+  meshtastic_ToRadio req = meshtastic_ToRadio_init_zero;
+  req.which_payload_variant = meshtastic_ToRadio_packet_tag;
+
+  meshtastic_MeshPacket *p = &req.packet;
+  p->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
+  p->to = 0xFFFFFFFF; // Broadcast
+
+  static uint32_t packetId = 0;
+  if (packetId == 0)
+    packetId = millis();
+  p->id = ++packetId;
+
+  int channelIndex = 0;
+  if (channelIndices.count("bontastic"))
+  {
+    channelIndex = channelIndices["bontastic"];
+  }
+  else if (channelIndices.count("Bontastic"))
+  {
+    channelIndex = channelIndices["Bontastic"];
+  }
+  p->channel = channelIndex;
+
+  meshtastic_Data *d = &p->decoded;
+  d->portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+  d->payload.size = strlen(message);
+  if (d->payload.size > sizeof(d->payload.bytes))
+  {
+    d->payload.size = sizeof(d->payload.bytes);
+  }
+  memcpy(d->payload.bytes, message, d->payload.size);
+
+  uint8_t buffer[256];
+  pb_ostream_t ostream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+  if (!pb_encode(&ostream, meshtastic_ToRadio_fields, &req))
+  {
+    bleLog("Notification encode failed");
+    return;
+  }
+
+  bleLogf("Sending notification: %s", message);
+  if (!toRadio->writeValue(buffer, ostream.bytes_written, true))
+  {
+    bleLog("Notification send failed");
   }
 }
 
