@@ -43,6 +43,7 @@ static NimBLERemoteCharacteristic *fromNum;
 static volatile bool fromRadioPending;
 static const int maxNotifyQueue = 8;
 static volatile int notifyQueueCount;
+static volatile bool configComplete = false;
 
 volatile bool meshtasticConnected;
 
@@ -130,6 +131,14 @@ void decodeFromRadioPacket(const std::string &packet)
     {
       channelIndices[c.settings.name] = c.index;
       bleLogf("Channel %s index %d", c.settings.name, c.index);
+    }
+  }
+  else if (msg.which_payload_variant == meshtastic_FromRadio_config_complete_id_tag)
+  {
+    if (msg.config_complete_id == wantConfigId)
+    {
+      configComplete = true;
+      bleLog("Config complete");
     }
   }
 }
@@ -301,7 +310,12 @@ void setup()
   }
 
   bleLog("Reading FromRadio");
-  drainFromRadio();
+  unsigned long startConfig = millis();
+  while (!configComplete && millis() - startConfig < 10000)
+  {
+    drainFromRadio();
+    delay(100);
+  }
 
   printStartupLogo();
 
@@ -350,6 +364,13 @@ void sendMeshtasticNotification(const char *message)
   p->id = ++packetId;
 
   int channelIndex = 0;
+
+  bleLogf("Available channels: %d", channelIndices.size());
+  for (auto const &[name, index] : channelIndices)
+  {
+    bleLogf(" - %s: %d", name.c_str(), index);
+  }
+
   if (channelIndices.count("bontastic"))
   {
     channelIndex = channelIndices["bontastic"];
@@ -358,6 +379,8 @@ void sendMeshtasticNotification(const char *message)
   {
     channelIndex = channelIndices["Bontastic"];
   }
+
+  bleLogf("Selected channel index: %d", channelIndex);
   p->channel = channelIndex;
 
   meshtastic_Data *d = &p->decoded;
