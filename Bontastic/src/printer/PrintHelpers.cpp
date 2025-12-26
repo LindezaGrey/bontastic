@@ -9,7 +9,7 @@
 #include <vector>
 #include <sstream>
 
-Bontastic_Thermal printer(&Serial2);
+Bontastic_Thermal printer(&Serial);
 
 static uint8_t reverseBits(uint8_t b)
 {
@@ -51,8 +51,8 @@ void gsV0WithUpsideDown(uint16_t widthBytes, uint16_t height, const uint8_t *dat
 
 void updatePrinterPins(int rx, int tx)
 {
-    Serial2.end();
-    Serial2.begin(9600, SERIAL_8N1, rx, tx);
+    Serial.end();
+    Serial.begin(9600, SERIAL_8N1, rx, tx);
     printer.begin();
     applyPrinterSettings();
 }

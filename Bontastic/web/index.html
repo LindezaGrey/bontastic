@@ -176,7 +176,8 @@
                 </div>
                 <div class="flex flex-col items-start text-s font-mono uppercase text-green-300/80">
                     <span>status :: {{ statusText }}</span>
-                    <span>device :: {{ connected ? 'linked' : 'idle' }}</span>
+                    <span :class="{'text-red-500': printerStatus}">device :: {{ printerStatus ? 'No Paper' : (connected
+                        ? 'linked' : 'idle') }}</span>
                 </div>
             </div>
             <div class="flex flex-wrap gap-4 items-center">
@@ -613,7 +614,8 @@
             printQr: '5a1a0014-8f19-4a86-9a9e-7b4f7f9b0002',
             meshConnected: '5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002',
             bitmap: '5a1a0016-8f19-4a86-9a9e-7b4f7f9b0002',
-            log: '5a1a0017-8f19-4a86-9a9e-7b4f7f9b0002'
+            log: '5a1a0017-8f19-4a86-9a9e-7b4f7f9b0002',
+            printerStatus: '5a1a0018-8f19-4a86-9a9e-7b4f7f9b0002'
         };
 
         const encoder = new TextEncoder();
@@ -632,6 +634,7 @@
                     connecting: false,
                     notificationsEnabled: false,
                     statusText: 'standby',
+                    printerStatus: false,
                     meshConnected: false,
                     settings: {
                         heatDots: 11,
@@ -857,6 +860,15 @@
                     if (key === 'meshConnected') {
                         this.meshConnected = !!value;
                         this.pushLog(`meshtastic :: ${this.meshConnected ? 'connected' : 'waiting'}`);
+                        return;
+                    }
+                    if (key === 'printerStatus') {
+                        this.printerStatus = !!value;
+                        if (this.printerStatus) {
+                            this.pushLog('DEVICE :: No Paper');
+                        } else {
+                            this.pushLog('DEVICE :: Ready');
+                        }
                         return;
                     }
                     if (Object.prototype.hasOwnProperty.call(this.settings, key)) {

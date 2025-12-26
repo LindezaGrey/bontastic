@@ -63,13 +63,16 @@ static const uint16_t printerAppearance = 0x03C0;
 static const char *meshLinkUuid = "5a1a0015-8f19-4a86-9a9e-7b4f7f9b0002";
 static const char *bitmapUuid = "5a1a0016-8f19-4a86-9a9e-7b4f7f9b0002";
 static const char *logUuid = "5a1a0017-8f19-4a86-9a9e-7b4f7f9b0002";
+static const char *printerStatusUuid = "5a1a0018-8f19-4a86-9a9e-7b4f7f9b0002";
 
 static NimBLEServer *printerServer;
 static NimBLECharacteristic *characteristics[FieldCount];
 static NimBLECharacteristic *meshLinkCharacteristic;
 static NimBLECharacteristic *bitmapCharacteristic;
 static NimBLECharacteristic *logCharacteristic;
+static NimBLECharacteristic *printerStatusCharacteristic;
 static bool lastMeshLink;
+static bool lastPrinterErrorState = false;
 static const PrinterSettings defaultSettings{11, 120, 40, 10, 2, 30, 0, 0, 0, 0, 0, 2, 23, "MO1_1dfd", "123456", 1, 2};
 static PrinterSettings printerSettings = defaultSettings;
 static Preferences printerPrefs;
@@ -673,6 +676,10 @@ void setupPrinterControl()
     logCharacteristic = service->createCharacteristic(logUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
     bleLogAttachCharacteristic(logCharacteristic);
 
+    printerStatusCharacteristic = service->createCharacteristic(printerStatusUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    printerStatusCharacteristic->setValue(lastPrinterErrorState ? "1" : "0");
+    pinMode(22, INPUT);
+
     service->start();
     loadSettings();
     applyPrinterConfig();
@@ -702,6 +709,22 @@ void printerControlLoop()
     {
         lastMeshLink = linked;
         syncMeshLink(true);
+    }
+
+    bool currentErrorState = (digitalRead(22) == HIGH);
+    if (currentErrorState != lastPrinterErrorState)
+    {
+        lastPrinterErrorState = currentErrorState;
+        printerStatusCharacteristic->setValue(currentErrorState ? "1" : "0");
+        printerStatusCharacteristic->notify();
+        if (currentErrorState)
+        {
+            bleLog("Printer Error: No Paper");
+        }
+        else
+        {
+            bleLog("Printer Error Cleared");
+        }
     }
 }
 
