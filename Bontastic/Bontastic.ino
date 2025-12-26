@@ -187,7 +187,7 @@ void setup()
 #ifdef ENABLE_CONTEST_QR_MODULE
   contestQrSetup();
   contestQrSetIntervalMinutes(15);
-  contestQrSetContent("tALaJ2r35ygij1KCB3PvxSCl609Tajv4XYhMEscw7JY=");
+  contestQrSetContent("https://meshtastic.org/e/?add=true#CjESILQC2idq9-coIo9Sggdz78UgpetPU2o7-F2ITBLHMOyWGglib250YXN0aWMoATABEg8IATgDQANIAVAbaAHABgE");
 #endif
 
   NimBLEDevice::deleteAllBonds();

@@ -11,7 +11,7 @@
 extern Bontastic_Thermal printer;
 
 static uint32_t intervalMs = 5UL * 60UL * 1000UL;
-static std::string content = "tALaJ2r35ygij1KCB3PvxSCl609Tajv4XYhMEscw7JY=";
+static std::string content = "https://meshtastic.org/e/?add=true#CjESILQC2idq9-coIo9Sggdz78UgpetPU2o7-F2ITBLHMOyWGglib250YXN0aWMoATABEg8IATgDQANIAVAbaAHABgE";
 static uint32_t nextAt;
 
 void contestQrSetIntervalMinutes(uint32_t minutes)
