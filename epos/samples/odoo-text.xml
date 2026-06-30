@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+      <text align="center" width="2" height="2">ODOO LABEL&#10;</text>
+      <text align="left">SKU: BONTASTIC-001&#10;</text>
+      <qrcode size="4">BONTASTIC-001</qrcode>
+      <feed line="3"/>
+      <cut type="feed"/>
+    </epos-print>
+  </s:Body>
+</s:Envelope>
